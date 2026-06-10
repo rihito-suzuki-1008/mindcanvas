@@ -13,6 +13,7 @@ const Sections = {
     if(!el){
       el=document.createElement('div'); el.className='section'; el.dataset.id=sec.id;
       el.innerHTML='<div class="section-title"></div><div class="grip"></div>';
+      el.addEventListener('pointerdown',(e)=>{ if(e.target===el) this.startDrag(e,sec.id); });
       el.querySelector('.section-title').addEventListener('pointerdown',(e)=>this.startDrag(e,sec.id));
       el.querySelector('.section-title').addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.editTitle(sec.id); });
       el.querySelector('.grip').addEventListener('pointerdown',(e)=>this.startResize(e,sec.id));
@@ -43,12 +44,13 @@ const Sections = {
     const snap=mcClone(State.project); let moved=false;
     const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY); const dx=w.x-start.x, dy=w.y-start.y;
       if(!moved&&Math.abs(dx)+Math.abs(dy)<2) return; moved=true;
-      sec.x=s0.x+dx; sec.y=s0.y+dy; kids.forEach(nid=>{ const n=State.getNode(nid); n.x=k0[nid].x+dx; n.y=k0[nid].y+dy; });
-      this.renderOne(sec); Nodes.applyPositions(); Edges.render(State.activeSheet()); };
+      const pf=State.prefs(), nx=s0.x+dx, ny=s0.y+dy;
+      const sx=pf.snap?Canvas.snap(nx):nx, sy=pf.snap?Canvas.snap(ny):ny;
+      const sdx=sx-s0.x, sdy=sy-s0.y;
+      sec.x=sx; sec.y=sy; kids.forEach(nid=>{ const n=State.getNode(nid); n.x=k0[nid].x+sdx; n.y=k0[nid].y+sdy; });
+      const sheet=State.activeSheet(); this.renderOne(sec); Nodes.applyPositions(); if(State.project.mode==='tree') Edges.renderBranches(sheet); Edges.render(sheet); };
     const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
-      if(moved){ if(State.prefs().snap){ sec.x=Canvas.snap(sec.x); sec.y=Canvas.snap(sec.y);
-        kids.forEach(nid=>{ const n=State.getNode(nid); n.x=Canvas.snap(n.x); n.y=Canvas.snap(n.y); }); }
-        History.pushSnapshot(snap); State.touchRender(); } };
+      if(moved){ History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
   },
   startResize(e,id){

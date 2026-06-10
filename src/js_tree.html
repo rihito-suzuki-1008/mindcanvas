@@ -69,6 +69,9 @@ const Tree = {
     const tgtEl=elt&&elt.closest?elt.closest('.node'):null;
     if(tgtEl){ const tid=tgtEl.dataset.id;
       if(!banned.has(tid) && tid!==node.parentId){ node.parentId=tid; const t=State.getNode(tid); if(t&&t.collapsed) t.collapsed=false; }
+      else if(node.parentId && tid!==node.parentId){ node.parentId=null; }
+    } else if(node.parentId){
+      node.parentId=null;
     }
     // y kept at drop position so siblings re-sort by drop order on next relayout
   }
