@@ -2,6 +2,7 @@
 const Shortcuts = {
   init(){
     document.addEventListener('keydown',(e)=>this.onKey(e));
+    document.addEventListener('paste',(e)=>this.onPaste(e));
     document.addEventListener('keyup',(e)=>{ if(e.code==='Space') App.spaceDown=false; });
     window.addEventListener('blur',()=>{ App.spaceDown=false; });
   },
@@ -19,9 +20,10 @@ const Shortcuts = {
     if(mod && e.key.toLowerCase()==='a'){ e.preventDefault(); Selection.selectAll(); return; }
     if(mod && e.key.toLowerCase()==='f'){ e.preventDefault(); Search.open(); return; }
     if(mod && e.key.toLowerCase()==='g'){ e.preventDefault(); e.shiftKey?Selection.ungroup():Selection.group(); return; }
-    if(mod && e.key.toLowerCase()==='c'){ App.copy(); return; }
-    if(mod && e.key.toLowerCase()==='x'){ App.cut(); return; }
-    if(mod && e.key.toLowerCase()==='v'){ App.paste(); return; }
+    if(mod && e.key.toLowerCase()==='c'){ e.preventDefault(); App.copy(); return; }
+    if(mod && e.key.toLowerCase()==='x'){ e.preventDefault(); App.cut(); return; }
+    if(mod && e.key.toLowerCase()==='v'){ this._pasteHandled=false;
+      clearTimeout(this._pasteT); this._pasteT=setTimeout(()=>{ if(!this._pasteHandled) App.paste(); },50); return; }
     if(mod && (e.key==='='||e.key==='+')){ e.preventDefault(); Canvas.zoomStep(1); return; }
     if(mod && e.key==='-'){ e.preventDefault(); Canvas.zoomStep(-1); return; }
     if(mod && e.key==='0'){ e.preventDefault(); const r=Canvas.rect(); Canvas.zoomAt(r.left+r.width/2,r.top+r.height/2, 1/Canvas.vp().zoom); return; }
@@ -47,6 +49,16 @@ const Shortcuts = {
       this.nudge(dx,dy); return; }
 
     if(e.key==='Escape'){ Edges.deselect(); Selection.clear(); Selection.refresh(); App.closeMenus(); }
+  },
+
+  onPaste(e){
+    if(App.screen!=='editor'||this.editing()) return;
+    const target=App.treePasteTarget&&App.treePasteTarget();
+    if(!target) return;
+    const text=e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+    if(!text) return;
+    if(App.clipboard&&App.clipboard.nodes&&App.clipboard.nodes.length&&text===App.clipboardText) return;
+    e.preventDefault(); this._pasteHandled=true; App.pasteTextAsChildren(target,text);
   },
 
   nudge(dx,dy){

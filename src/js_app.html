@@ -1,6 +1,6 @@
 <script>
 const App = {
-  screen:'home', tool:'select', spaceDown:false, clipboard:null,
+  screen:'home', tool:'select', spaceDown:false, clipboard:null, clipboardText:'',
 
   init(){
     Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Shortcuts.init(); Home.init();
@@ -71,10 +71,19 @@ const App = {
     const s=State.activeSheet(); const idset=new Set(ids);
     this.clipboard={ nodes:ids.map(id=>mcClone(s.nodes[id])),
       edges:Object.values(s.edges).filter(e=>idset.has(e.from)&&idset.has(e.to)).map(mcClone) };
+    this.clipboardText=this.clipboard.nodes.map(n=>Exporter.label(n)).join('\n');
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(this.clipboardText).catch(()=>{});
     this.toast(ids.length+'件をコピー');
   },
   cut(){ this.copy(); Selection.deleteSelected(); },
-  paste(){
+  async paste(){
+    const target=this.treePasteTarget();
+    if(target){
+      const sysText=await this.readClipboardText();
+      if(sysText && sysText!==this.clipboardText){ this.pasteTextAsChildren(target, sysText); return; }
+      if(this.clipboard&&this.clipboard.nodes&&this.clipboard.nodes.length){ this.pasteNodesAsChildren(target); return; }
+      if(sysText){ this.pasteTextAsChildren(target, sysText); return; }
+    }
     if(!this.clipboard||!this.clipboard.nodes.length) return;
     const snap=mcClone(State.project); const s=State.activeSheet(); const off=30;
     const map={}, gmap={}; this.clipboard.nodes.forEach(n=>{ map[n.id]=uid('n'); });
@@ -86,6 +95,53 @@ const App = {
     History.pushSnapshot(snap); State.touchRender();
     Selection.clear(); Object.values(map).forEach(id=>Selection.nodes.add(id)); Selection.refresh();
     this.toast('貼り付けました');
+  },
+  treePasteTarget(){
+    if(!State.project || State.project.mode!=='tree') return null;
+    const ids=Selection.nodeIds();
+    return ids.length===1 ? ids[0] : null;
+  },
+  async readClipboardText(){
+    if(!navigator.clipboard || !navigator.clipboard.readText) return '';
+    try{ return (await navigator.clipboard.readText()) || ''; }catch(e){ return ''; }
+  },
+  pasteTextAsChildren(parentId,text){
+    const lines=String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    if(!lines.length) return;
+    const parent=State.getNode(parentId); if(!parent) return;
+    const snap=mcClone(State.project), made=[];
+    if(parent.collapsed) parent.collapsed=false;
+    const sibs=Tree.childrenOf(parentId);
+    let y=sibs.length ? (sibs[sibs.length-1].y + Tree.H(sibs[sibs.length-1]) + State.V_GAP) : parent.y;
+    lines.forEach(line=>{
+      const n=State.addNode({ parentId:parentId, x:parent.x+Tree.W(parent)+State.H_GAP, y:y, text:line });
+      made.push(n.id); y+=Tree.H(n)+State.V_GAP;
+    });
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.clear(); made.forEach(id=>Selection.nodes.add(id)); Selection.refresh();
+    this.toast(made.length+'件を子ノードに追加しました');
+  },
+  pasteNodesAsChildren(parentId){
+    if(!this.clipboard||!this.clipboard.nodes.length) return;
+    const parent=State.getNode(parentId); if(!parent) return;
+    const snap=mcClone(State.project), s=State.activeSheet(), idset=new Set(this.clipboard.nodes.map(n=>n.id));
+    const map={}, made=[]; this.clipboard.nodes.forEach(n=>{ map[n.id]=uid('n'); });
+    if(parent.collapsed) parent.collapsed=false;
+    const roots=this.clipboard.nodes.filter(n=>!n.parentId || !idset.has(n.parentId)).sort((a,b)=>a.y-b.y || a.x-b.x);
+    const rootSet=new Set(roots.map(n=>n.id));
+    const sibs=Tree.childrenOf(parentId);
+    let rootY=sibs.length ? (sibs[sibs.length-1].y + Tree.H(sibs[sibs.length-1]) + State.V_GAP) : parent.y;
+    const rootYByOld={}; roots.forEach(r=>{ rootYByOld[r.id]=rootY; rootY+=Tree.H(r)+State.V_GAP; });
+    this.clipboard.nodes.forEach(n=>{
+      const nn=mcClone(n); nn.id=map[n.id]; nn.groupId=null;
+      nn.parentId=rootSet.has(n.id) ? parentId : (n.parentId&&map[n.parentId]?map[n.parentId]:parentId);
+      if(rootSet.has(n.id)){ nn.x=parent.x+Tree.W(parent)+State.H_GAP; nn.y=rootYByOld[n.id]; }
+      delete nn._fresh; delete nn._hidden; s.nodes[nn.id]=nn; made.push(nn.id);
+    });
+    this.clipboard.edges.forEach(e=>{ if(map[e.from]&&map[e.to]){ const ne=mcClone(e); ne.id=uid('e'); ne.from=map[e.from]; ne.to=map[e.to]; s.edges[ne.id]=ne; } });
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.clear(); made.forEach(id=>Selection.nodes.add(id)); Selection.refresh();
+    this.toast(made.length+'件を子ノードに追加しました');
   },
 
   /* ---------- toast ---------- */

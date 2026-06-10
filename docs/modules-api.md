@@ -117,7 +117,7 @@
 `run(kind)`（'png'|'pdf'|'md'|'mermaid'）/ `capture()`（fit→html-to-image→復元）/ `png()` / `pdf()` / `markdown()` / `mermaid()` / `showText(title,text,ext)`
 
 ## Shortcuts（js_shortcuts）
-`init()` / `editing()` / `onKey(e)` / `nudge(dx,dy)`
+`init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`
 
 ## Home（js_home）
 `show()` / `render()` / `duplicate(id)` / `remove(id,name)` / `newModal()` / `create(name,mode)`
@@ -125,12 +125,13 @@
 ## App（js_app）— 統括
 | メンバー | 説明 |
 |---|---|
-| `screen`('home'|'editor') / `tool` / `spaceDown` / `clipboard` | 状態 |
+| `screen`('home'|'editor') / `tool` / `spaceDown` / `clipboard` / `clipboardText` | 状態 |
 | `init()` | 全モジュール初期化 + UI 結線 + ホーム表示 |
 | `enterEditor(p)` / `openProject(id)` / `showHome()` | 遷移 |
 | `render()` | アクティブシート描画（[architecture 2.3](architecture.md) の順序） |
 | `setTool(t)` / `updateToolbar()` / `updateAlignBar()` / `updateSheetTabs()` / `closeMenus()` | UI |
-| `copy()` / `cut()` / `paste()` | クリップボード（id 再採番・内部エッジ/グループ複製） |
+| `copy()` / `cut()` / `paste()` | クリップボード（id 再採番・内部エッジ/グループ複製）。ツリー型で単一ノード選択中の `paste()` は子ノード追加として扱う |
+| `pasteTextAsChildren(parentId,text)` / `pasteNodesAsChildren(parentId)` | ツリー型の選択ノード配下ペースト |
 | `toast(msg)` | 通知 |
 | `onStageDown(e)` | ステージ背景の pointerdown 振り分け |
 
