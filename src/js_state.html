@@ -10,7 +10,7 @@ function iconSvg(name, cls){ return '<svg class="i '+(cls||'')+'" aria-hidden="t
 /* ===== state ===== */
 const State = {
   project:null,
-  GRID:20, NODE_W:200, FREE_NODE_W:170, FREE_NODE_H:150, H_GAP:64, V_GAP:18,
+  GRID:20, NODE_W:200, FREE_NODE_W:170, FREE_NODE_H:150, MIN_NODE_W:120, MIN_NODE_H:80, H_GAP:64, V_GAP:18,
 
   activeSheet(){
     const p=this.project; if(!p) return null;

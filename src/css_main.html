@@ -178,7 +178,7 @@ button:disabled{cursor:not-allowed}
 
 /* connection handles */
 .node .handle{position:absolute; width:11px; height:11px; background:#fff; border:2px solid var(--accent);
-  border-radius:50%; opacity:0; transition:opacity .1s; z-index:3; cursor:crosshair}
+  border-radius:50%; opacity:0; transition:opacity .1s; z-index:6; cursor:crosshair}
 .node:hover .handle,.node.selected .handle{opacity:.9}
 .handle.t{top:-6px; left:50%; transform:translateX(-50%)}
 .handle.b{bottom:-6px; left:50%; transform:translateX(-50%)}
@@ -190,6 +190,18 @@ button:disabled{cursor:not-allowed}
 .node:hover .grip{opacity:.5}
 .node .grip::after{content:""; position:absolute; right:3px; bottom:3px; width:7px; height:7px;
   border-right:2px solid var(--muted); border-bottom:2px solid var(--muted)}
+.node.freeform-node .grip{display:none}
+.resize-handle{display:none; position:absolute; opacity:0; z-index:4}
+.freeform-node .resize-handle{display:block}
+.freeform-node:hover .resize-handle,.freeform-node.selected .resize-handle{opacity:1}
+.resize-handle::after{content:""; position:absolute; inset:2px; border:1.5px solid rgba(104,115,134,.55); background:#fff; border-radius:4px}
+.rh-n,.rh-s{left:24px; right:24px; height:8px; cursor:ns-resize}
+.rh-n{top:-4px}.rh-s{bottom:-4px}
+.rh-e,.rh-w{top:24px; bottom:24px; width:8px; cursor:ew-resize}
+.rh-e{right:-4px}.rh-w{left:-4px}
+.rh-ne,.rh-se,.rh-sw,.rh-nw{width:12px; height:12px}
+.rh-ne{right:-5px; top:-5px; cursor:nesw-resize}.rh-se{right:-5px; bottom:-5px; cursor:nwse-resize}
+.rh-sw{left:-5px; bottom:-5px; cursor:nesw-resize}.rh-nw{left:-5px; top:-5px; cursor:nwse-resize}
 .node.collapsed-parent::after{content:attr(data-count); position:absolute; right:-22px; top:50%;
   transform:translateY(-50%); background:var(--accent); color:#fff; font-size:10px; min-width:18px;
   height:18px; border-radius:99px; display:flex; align-items:center; justify-content:center; padding:0 4px}
