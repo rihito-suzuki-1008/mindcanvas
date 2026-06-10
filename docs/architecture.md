@@ -104,9 +104,8 @@ freeform   : Nodes.render
 ## 2.5 ディレクトリ構成
 
 ```
-xmind/
-├ .clasp.json            # rootDir: src（コンテナバインド scriptId）
-├ .clasp.json.standalone # 旧スタンドアロン版の退避
+mindcanvas/
+├ .clasp.json            # 各自で作成（rootDir: src、scriptId は公開しない）
 ├ src/                   # ← clasp push 対象（GASに上がる）
 │  ├ appsscript.json     # runtime/webapp/oauthScopes(drive.file + spreadsheets.currentonly)
 │  ├ Code.gs             # サーバ: doGet/include/probeDurable/drive*/sheet*
@@ -116,8 +115,6 @@ xmind/
 ├ docs/                  # ← 本仕様書（push 対象外）
 ├ build_local.js         # ローカル検証用ビルダ（push 対象外）
 ├ local_preview.html     # 生成物（push 対象外）
-├ .claude/launch.json    # ローカルプレビュー用サーバ定義
-└ 参考/                  # XMind/FigJam の保存HTML（参考）
 ```
 
 > `clasp` は `src/` のみを push する。`docs/` `build_local.js` `local_preview.html` は GAS に上がらない。

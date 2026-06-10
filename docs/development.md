@@ -27,7 +27,11 @@ node build_local.js          # src/ を読み、include を展開して local_pr
 - 生成物 `local_preview.html` と `build_local.js` は `src/` 外なので push されない。
 
 ### プレビューサーバ
-`.claude/launch.json` に静的サーバ（`python3 -m http.server 8765`）を定義済み。起動して `http://localhost:8765/local_preview.html` を開く。
+リポジトリルートで静的サーバを起動して `http://localhost:8765/local_preview.html` を開く。
+
+```bash
+python3 -m http.server 8765
+```
 
 > 注意：コードを変更したら **再度 `node build_local.js`** を実行し、ブラウザを再読込（キャッシュ回避に `?v=<時刻>` を付与）する。
 
@@ -37,15 +41,15 @@ node build_local.js          # src/ を読み、include を展開して local_pr
 clasp push には **Apps Script API の有効化**が必要：
 https://script.google.com/home/usersettings → 「Google Apps Script API」を ON（反映に数分）。
 
-### コンテナバインド版の作成（社内＝Drive 封印向け）
-スプレッドシートにバインドすると `spreadsheets.currentonly` でスプシ保存でき、Drive 封印を回避できる。
+### コンテナバインド版の作成
+スプレッドシートにバインドすると `spreadsheets.currentonly` でスプシ保存でき、Drive が使えない環境でも利用できる。
 ```bash
 # 一時dirで bound プロジェクト（スプシ + script）を作成し scriptId を取得
 cd /tmp && clasp create --type sheets --title "MindCanvas"
 # 取得した scriptId を本体 .clasp.json の "scriptId" に設定（rootDir:src は維持）
 ```
 - bound script には既定の `Code.gs` があり、ローカル `Code.js` と GAS 上で同名 "Code" になり衝突する。**サーバファイルは `src/Code.gs`** とする（本リポジトリ対応済み）。
-- スタンドアロン版の設定は `.clasp.json.standalone` に退避済み。
+- `.clasp.json` は各自の `scriptId` を含むため、リポジトリには含めない。
 
 ### push / deploy
 ```bash
@@ -78,7 +82,7 @@ clasp deploy --description "MindCanvas v2 (sheet-bound)"
 |---|---|
 | ダイアログ | シート名・接続ラベル・削除確認に `window.prompt/confirm` を使用。GAS サンドボックスでは動作するが、将来はカスタムモーダル化が望ましい。 |
 | 永続性 | localStorage は origin 変動で揮発し得るため durable backend（Drive 優先・スプシ フォールバック）が前提（[storage-and-sync](storage-and-sync.md)）。 |
-| Drive 封印環境 | `drive.file` 認可が拒否されると起動不可。`appsscript.json` の `drive.file` 行を削除すれば probe が自動で Sheets 専用に倒す。 |
+| Drive 制限環境 | `drive.file` 認可が拒否されると起動不可。`appsscript.json` の `drive.file` 行を削除すれば probe が自動で Sheets 専用に倒す。 |
 | スプシ 1セル制限 | Sheet backend は 1プロジェクト=1セル(json)。~5万文字上限。巨大マップは将来分割が必要。 |
 | 同時編集 | 非対応（last-write-wins）。複数タブ/端末で同一プロジェクトを同時編集すると上書きが起こり得る。 |
 | エクスポート解像度 | PNG は「現在シートの fit 表示」を pixelRatio 2 で撮影。極端に広いボードは縮小され細部が潰れる場合がある。 |

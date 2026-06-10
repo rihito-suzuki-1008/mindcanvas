@@ -10,7 +10,7 @@
 | **durable: Google Drive** | 自動バックアップ（**優先**） | `drive.file`。フォルダ `MindCanvas/mc_<id>.json` |
 | **durable: スプレッドシート** | 自動バックアップ（**フォールバック**） | `spreadsheets.currentonly`。コンテナバインド先の隠しシート `_mc_data` |
 
-> 起動時に `probeDurable()` で Drive / Sheets の可否を判定し、**Drive 優先・不可なら Sheets** を `Store.backend` に確定。両方不可なら `local`（localStorage のみ）。**社内で Drive が封印されていれば自動で Sheets に倒れる。**
+> 起動時に `probeDurable()` で Drive / Sheets の可否を判定し、**Drive 優先・不可なら Sheets** を `Store.backend` に確定。両方不可なら `local`（localStorage のみ）。**Drive 利用に制限がある環境では自動で Sheets に倒れる。**
 
 ## 6.2 バックエンド選択（起動時）
 
