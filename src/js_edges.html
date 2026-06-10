@@ -120,7 +120,8 @@ const Edges = {
         History.pushSnapshot(snap); State.touchRender();
       } else if(!nodeEl){
         const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
-        const nn=State.addNode({ x:Canvas.snap(w.x-State.NODE_W/2), y:Canvas.snap(w.y-20), text:'' }); nn._fresh=true;
+        const d=State.nodeDefaults(State.project.mode);
+        const nn=State.addNode({ x:Canvas.snap(w.x-d.w/2), y:Canvas.snap(w.y-(d.h?d.h/2:20)), w:d.w, h:d.h, text:'' }); nn._fresh=true;
         State.addEdge(fromId, nn.id, {fromSide:side});
         History.pushSnapshot(snap); State.touchRender();
         Selection.selectNode(nn.id); Nodes.refreshSelection(); Nodes.beginEdit(nn.id,'text');

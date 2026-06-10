@@ -4,8 +4,25 @@ const Exporter = {
   label(n){ let t=((n.text||'').split('\n')[0]||'').trim();
     t=t.replace(/^#{1,6}\s*/,'').replace(/^[-*+]\s+/,'').replace(/\*\*/g,'').replace(/`/g,'').trim();
     return t||'(空)'; },
+  sectionLabel(sec){ return (sec.title||'セクション').replace(/"/g,"'").replace(/[\[\]]/g,'').trim()||'セクション'; },
   childrenIn(sheet,id){ const out=[]; for(const k in sheet.nodes){ if(sheet.nodes[k].parentId===id) out.push(sheet.nodes[k]); } out.sort((a,b)=>a.y-b.y); return out; },
   rootsIn(sheet){ const out=[]; for(const id in sheet.nodes){ const n=sheet.nodes[id]; if(!n.parentId||!sheet.nodes[n.parentId]) out.push(n); } out.sort((a,b)=>a.y-b.y); return out; },
+  sectionNodes(sheet,sec){
+    const out=[];
+    for(const id in sheet.nodes){ const n=sheet.nodes[id];
+      const w=n.w||State.NODE_W, h=n.h||60, cx=n.x+w/2, cy=n.y+h/2;
+      if(cx>=sec.x && cx<=sec.x+sec.w && cy>=sec.y && cy<=sec.y+sec.h) out.push(n);
+    }
+    out.sort((a,b)=>a.y-b.y || a.x-b.x); return out;
+  },
+  sectionMap(sheet){
+    const map={}, used=new Set();
+    Object.values(sheet.sections||{}).sort((a,b)=>a.y-b.y || a.x-b.x).forEach(sec=>{
+      const nodes=this.sectionNodes(sheet,sec).filter(n=>!used.has(n.id));
+      map[sec.id]=nodes; nodes.forEach(n=>used.add(n.id));
+    });
+    return {map, used};
+  },
 
   run(kind){
     if(kind==='png') this.png();
@@ -48,9 +65,14 @@ const Exporter = {
       L.push('## '+sh.name,'');
       if(p.mode==='tree'){
         this.rootsIn(sh).forEach(r=>this._walk(sh,r,0,L));
+        this._sectionMarkdown(sh,L);
       } else {
-        for(const id in sh.nodes){ const n=sh.nodes[id]; L.push('- '+this.label(n));
-          if(n.memo) n.memo.split('\n').forEach(m=>L.push('  > '+m)); }
+        const grouped=this._sectionMarkdown(sh,L);
+        const loose=[];
+        for(const id in sh.nodes){ if(!grouped.has(id)) loose.push(sh.nodes[id]); }
+        loose.sort((a,b)=>a.y-b.y || a.x-b.x);
+        if(loose.length){ if(Object.keys(sh.sections||{}).length) L.push('### セクション外','');
+          loose.forEach(n=>{ L.push('- '+this.label(n)); if(n.memo) n.memo.split('\n').forEach(m=>L.push('  > '+m)); }); }
         const es=Object.values(sh.edges);
         if(es.length){ L.push('','**接続**','');
           es.forEach(e=>{ const a=sh.nodes[e.from], b=sh.nodes[e.to]; if(a&&b)
@@ -59,6 +81,17 @@ const Exporter = {
       L.push('');
     });
     return L.join('\n');
+  },
+  _sectionMarkdown(sheet,L){
+    const sm=this.sectionMap(sheet), secs=Object.values(sheet.sections||{}).sort((a,b)=>a.y-b.y || a.x-b.x);
+    if(!secs.length) return sm.used;
+    L.push('### セクション','');
+    secs.forEach(sec=>{
+      L.push('- '+(sec.title||'セクション'));
+      (sm.map[sec.id]||[]).forEach(n=>{ L.push('  - '+this.label(n)); if(n.memo) n.memo.split('\n').forEach(m=>L.push('    > '+m)); });
+    });
+    L.push('');
+    return sm.used;
   },
   _walk(sheet,node,depth,L){
     L.push('  '.repeat(depth)+'- '+this.label(node));
@@ -70,9 +103,16 @@ const Exporter = {
   mermaid(){
     const p=State.project, sh=State.activeSheet();
     const sid=(id)=>'n_'+id.replace(/[^a-zA-Z0-9_]/g,'');
+    const secid=(id)=>'sec_'+id.replace(/[^a-zA-Z0-9_]/g,'');
     const tx=(n)=>this.label(n).replace(/"/g,"'").replace(/[\[\]]/g,'');
     const L=['flowchart LR'];
-    for(const id in sh.nodes){ const n=sh.nodes[id]; L.push('  '+sid(id)+'["'+tx(n)+'"]'); }
+    const sm=this.sectionMap(sh);
+    Object.values(sh.sections||{}).sort((a,b)=>a.y-b.y || a.x-b.x).forEach(sec=>{
+      L.push('  subgraph '+secid(sec.id)+'["'+this.sectionLabel(sec)+'"]');
+      (sm.map[sec.id]||[]).forEach(n=>L.push('    '+sid(n.id)+'["'+tx(n)+'"]'));
+      L.push('  end');
+    });
+    for(const id in sh.nodes){ if(sm.used.has(id)) continue; const n=sh.nodes[id]; L.push('  '+sid(id)+'["'+tx(n)+'"]'); }
     if(p.mode==='tree'){
       for(const id in sh.nodes){ const n=sh.nodes[id]; if(n.parentId&&sh.nodes[n.parentId]) L.push('  '+sid(n.parentId)+' --> '+sid(id)); }
     }

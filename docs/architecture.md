@@ -52,6 +52,8 @@
 
 ## 2.3 レンダリング方式（DOM + SVG ハイブリッド）
 
+<!-- 2026-06-10 / #7: UIアイコンは絵文字・記号文字ではなく、index.html 内のSVGスプライトを参照する。エッジ/枝SVGとは別用途。 -->
+
 | レイヤ | 要素 | 座標系 |
 |---|---|---|
 | `#canvas-bg` | グリッド背景（CSS background） | スクリーン（pan/zoom に追従して bg-position/size を更新） |
@@ -66,7 +68,7 @@
 ### 再描画戦略（リコンサイル）
 - `App.render()` がアクティブシートを描画。各モジュールは **id をキーに DOM 要素を再利用**し、存在しない要素を生成・不要な要素を削除する（全消し再生成はしない）。
 - 編集中ノードは `Nodes.editingId` で保護し、内容を上書きしない（textarea が消えない）。
-- ドラッグ中は `App.render()` を介さず、該当要素の位置のみ更新（`Nodes.applyPositions()` + `Edges.render()`）。
+- ドラッグ中は `App.render()` を介さず、該当要素の位置のみ更新（`Nodes.applyPositions()` + ツリー型は `Edges.renderBranches()` + `Edges.render()`）。
 
 ### `App.render()` の処理順
 ```

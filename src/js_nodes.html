@@ -32,13 +32,18 @@ const Nodes = {
         '<div class="handle t" data-side="t"></div><div class="handle r" data-side="r"></div>'+
         '<div class="handle b" data-side="b"></div><div class="handle l" data-side="l"></div>'+
         '<button class="collapse-toggle" hidden></button>'+
+        '<div class="resize-handle rh-n" data-dir="n"></div><div class="resize-handle rh-e" data-dir="e"></div>'+
+        '<div class="resize-handle rh-s" data-dir="s"></div><div class="resize-handle rh-w" data-dir="w"></div>'+
+        '<div class="resize-handle rh-ne" data-dir="ne"></div><div class="resize-handle rh-se" data-dir="se"></div>'+
+        '<div class="resize-handle rh-sw" data-dir="sw"></div><div class="resize-handle rh-nw" data-dir="nw"></div>'+
         '<div class="grip"></div>';
       el.addEventListener('pointerdown',(e)=>this.onNodePointerDown(e,n.id));
       el.addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.beginEdit(n.id,'text'); });
       el.querySelectorAll('.handle').forEach(h=>h.addEventListener('pointerdown',(e)=>{
         e.stopPropagation(); Edges.startLink(e,n.id,h.dataset.side);
       }));
-      el.querySelector('.grip').addEventListener('pointerdown',(e)=>this.startResize(e,n.id));
+      el.querySelector('.grip').addEventListener('pointerdown',(e)=>this.startResize(e,n.id,'e'));
+      el.querySelectorAll('.resize-handle').forEach(h=>h.addEventListener('pointerdown',(e)=>this.startResize(e,n.id,h.dataset.dir)));
       el.querySelector('.node-memo').addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.beginEdit(n.id,'memo'); });
       el.querySelector('.collapse-toggle').addEventListener('pointerdown',(e)=>{ e.stopPropagation(); });
       el.querySelector('.collapse-toggle').addEventListener('click',(e)=>{ e.stopPropagation(); Tree.toggleCollapse(n.id); });
@@ -49,8 +54,9 @@ const Nodes = {
       const memo=el.querySelector('.node-memo');
       if(n.memo){ memo.hidden=false; memo.textContent=n.memo; } else memo.hidden=true;
     }
-    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px';
+    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
     el.classList.toggle('selected', Selection.hasNode(n.id));
+    el.classList.toggle('freeform-node', State.project.mode==='freeform');
     // tree collapse toggle
     const tg=el.querySelector('.collapse-toggle');
     if(State.project.mode==='tree' && this.hasChildren(n.id)){
@@ -64,7 +70,7 @@ const Nodes = {
   applyPositions(){
     const s=State.activeSheet(); if(!s) return;
     for(const id in this.els){ const n=s.nodes[id]; if(!n) continue;
-      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; }
+      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; this.els[id].style.minHeight=(n.h||0)+'px'; }
   },
   refreshSelection(){ for(const id in this.els){ this.els[id].classList.toggle('selected', Selection.hasNode(id)); } },
 
@@ -82,7 +88,7 @@ const Nodes = {
     if(this._which==='memo'){ el.querySelector('.node-memo').hidden=true; el.appendChild(ta); }
     else { el.querySelector('.node-md').style.display='none'; el.insertBefore(ta, el.firstChild); }
     const fit=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
-    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ Tree.relayout(); this.applyPositions(); Edges.render(State.activeSheet()); } });
+    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ const sheet=State.activeSheet(); Tree.relayout(); this.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); } });
     ta.addEventListener('keydown',(ev)=>this.onEditKey(ev,id));
     ta.addEventListener('blur',()=>this.commitEdit());
     this._editor=ta;
@@ -120,7 +126,9 @@ const Nodes = {
   /* ---------- create ---------- */
   createAt(wx,wy,opts){
     const snap=mcClone(State.project);
-    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-State.NODE_W/2), y:Canvas.snap(wy-20), text:'' }, opts||{}));
+    const o=opts||{}, d=State.nodeDefaults(State.project.mode);
+    const w=o.w||d.w, h=o.h!=null?o.h:d.h;
+    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-w/2), y:Canvas.snap(wy-(h?h/2:20)), w:w, h:h, text:'' }, o));
     n._fresh=true;
     History.pushSnapshot(snap); State.touchRender();
     Selection.selectNode(n.id); this.refreshSelection();
@@ -140,17 +148,31 @@ const Nodes = {
     if(!Selection.hasNode(id)) return;
 
     const tree=State.project.mode==='tree';
+    const duplicateDrag=!tree && e.altKey;
     const start=Canvas.screenToWorld(e.clientX,e.clientY);
     let ids=Selection.nodeIds();
     if(tree){ const set=new Set(ids); ids.forEach(nid=>Tree.descendants(nid).forEach(d=>set.add(d))); ids=[...set]; }
-    const starts={}; ids.forEach(nid=>{ const nn=State.getNode(nid); starts[nid]={x:nn.x,y:nn.y}; });
+    let starts={}; ids.forEach(nid=>{ const nn=State.getNode(nid); starts[nid]={x:nn.x,y:nn.y}; });
     const snap=mcClone(State.project); let moved=false;
+    const duplicateForDrag=()=>{
+      const s=State.activeSheet(), src=s.nodes[id]; if(!src) return false;
+      const nn=mcClone(src); nn.id=uid('n'); nn.parentId=null; nn.groupId=null; delete nn._fresh; delete nn._hidden;
+      s.nodes[nn.id]=nn; ids=[nn.id]; starts={}; starts[nn.id]={x:src.x,y:src.y};
+      State.addEdge(id, nn.id);
+      Selection.clear(); Selection.nodes.add(nn.id); this.renderOne(nn); this.refreshSelection(); App.updateAlignBar();
+      return true;
+    };
     const move=(ev)=>{
       const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
       const dx=w.x-start.x, dy=w.y-start.y;
-      if(!moved && Math.abs(dx)+Math.abs(dy)<2) return; moved=true;
-      ids.forEach(nid=>{ const nn=State.getNode(nid); nn.x=starts[nid].x+dx; nn.y=starts[nid].y+dy; });
-      this.applyPositions(); Edges.render(State.activeSheet()); if(typeof Minimap!=='undefined') Minimap.draw();
+      if(!moved && Math.abs(dx)+Math.abs(dy)<2) return;
+      if(!moved){ moved=true; if(duplicateDrag && !duplicateForDrag()) return; }
+      const pf=State.prefs();
+      ids.forEach(nid=>{ const nn=State.getNode(nid);
+        const nx=starts[nid].x+dx, ny=starts[nid].y+dy;
+        nn.x=pf.snap?Canvas.snap(nx):nx; nn.y=pf.snap?Canvas.snap(ny):ny;
+      });
+      const sheet=State.activeSheet(); this.applyPositions(); if(tree) Edges.renderBranches(sheet); Edges.render(sheet); if(typeof Minimap!=='undefined') Minimap.draw();
     };
     const up=(ev)=>{
       window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
@@ -163,15 +185,32 @@ const Nodes = {
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
   },
 
-  startResize(e,id){
+  startResize(e,id,dir){
     e.stopPropagation(); if(e.button!==0) return;
-    const n=State.getNode(id); const start=Canvas.screenToWorld(e.clientX,e.clientY); const w0=n.w;
+    dir=dir||'e';
+    const n=State.getNode(id); const start=Canvas.screenToWorld(e.clientX,e.clientY);
+    const el=this.els[id], w0=n.w, h0=n.h || (el?el.offsetHeight:State.MIN_NODE_H), x0=n.x, y0=n.y;
     const snap=mcClone(State.project); let moved=false;
-    const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY); n.w=Math.max(120,w0+(w.x-start.x)); moved=true;
+    const minW=State.MIN_NODE_W, minH=State.MIN_NODE_H, free=State.project.mode==='freeform';
+    const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY), dx=w.x-start.x, dy=w.y-start.y;
+      if(free){
+        let nx=x0, ny=y0, nw=w0, nh=h0;
+        if(dir.indexOf('e')>=0) nw=w0+dx;
+        if(dir.indexOf('s')>=0) nh=h0+dy;
+        if(dir.indexOf('w')>=0){ nw=w0-dx; nx=x0+dx; }
+        if(dir.indexOf('n')>=0){ nh=h0-dy; ny=y0+dy; }
+        if(nw<minW){ if(dir.indexOf('w')>=0) nx=x0+w0-minW; nw=minW; }
+        if(nh<minH){ if(dir.indexOf('n')>=0) ny=y0+h0-minH; nh=minH; }
+        if(State.prefs().snap){ const x2=Canvas.snap(nx+nw), y2=Canvas.snap(ny+nh); nx=Canvas.snap(nx); ny=Canvas.snap(ny); nw=Math.max(minW,x2-nx); nh=Math.max(minH,y2-ny); }
+        n.x=nx; n.y=ny; n.w=nw; n.h=nh;
+      } else {
+        n.w=Math.max(minW, State.prefs().snap?Canvas.snap(w0+dx):w0+dx);
+      }
+      moved=true;
       if(State.project.mode==='tree'){ Tree.relayout(); }
-      this.applyPositions(); Edges.render(State.activeSheet()); };
+      const sheet=State.activeSheet(); this.applyPositions(); if(State.project.mode==='tree') Edges.renderBranches(sheet); Edges.render(sheet); };
     const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
-      if(moved){ if(State.prefs().snap) n.w=Math.max(120,Canvas.snap(n.w)); History.pushSnapshot(snap); State.touchRender(); } };
+      if(moved){ History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
   }
 };

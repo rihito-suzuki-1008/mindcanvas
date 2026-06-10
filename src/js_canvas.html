@@ -68,12 +68,15 @@ const Canvas = {
   },
   zoomStep(dir){ const r=this.rect(); this.zoomAt(r.left+r.width/2, r.top+r.height/2, dir>0?1.2:1/1.2); },
 
-  startPan(e){
+  startPan(e,onClick){
     this.stage.classList.add('panning');
     const sx=e.clientX, sy=e.clientY, vp=this.vp(), ox=vp.x, oy=vp.y;
-    const move=(ev)=>{ vp.x=ox+(ev.clientX-sx); vp.y=oy+(ev.clientY-sy); this.apply(); };
+    let moved=false;
+    const move=(ev)=>{ if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)>2) moved=true;
+      vp.x=ox+(ev.clientX-sx); vp.y=oy+(ev.clientY-sy); this.apply(); };
     const up=()=>{ this.stage.classList.remove('panning');
-      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); this._persist(); };
+      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      if(!moved && onClick) onClick(); this._persist(); };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
   },
 
