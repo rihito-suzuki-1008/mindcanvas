@@ -1,0 +1,76 @@
+<script>
+const Tree = {
+  isTree(){ return State.project && State.project.mode==='tree'; },
+  W(n){ const el=Nodes.els[n.id]; return el?el.offsetWidth:n.w; },
+  H(n){ const el=Nodes.els[n.id]; return el?el.offsetHeight:(n.h||60); },
+
+  roots(){ const s=State.activeSheet(), out=[]; for(const id in s.nodes){ const n=s.nodes[id];
+    if(!n.parentId || !s.nodes[n.parentId]) out.push(n); } return out; },
+  childrenOf(id){ const s=State.activeSheet(), out=[]; for(const k in s.nodes){ if(s.nodes[k].parentId===id) out.push(s.nodes[k]); }
+    out.sort((a,b)=>a.y-b.y); return out; },
+  descendants(id){ const out=[]; const walk=(pid)=>{ this.childrenOf(pid).forEach(c=>{ out.push(c.id); walk(c.id); }); }; walk(id); return out; },
+
+  computeVisibility(){
+    const s=State.activeSheet(); for(const id in s.nodes) s.nodes[id]._hidden=false;
+    const hide=(pid)=>{ this.childrenOf(pid).forEach(c=>{ c._hidden=true; hide(c.id); }); };
+    for(const id in s.nodes){ if(s.nodes[id].collapsed) hide(id); }
+  },
+
+  relayout(){
+    if(!this.isTree()) return;
+    const roots=this.roots();
+    roots.forEach(root=>{
+      const pos={};
+      this._lay(root, 0, 0, pos);
+      const dx=root.x-pos[root.id].x, dy=root.y-pos[root.id].y;
+      for(const id in pos){ const n=State.getNode(id); if(!n) continue; n.x=pos[id].x+dx; n.y=pos[id].y+dy; }
+    });
+  },
+  _lay(node, x, yTop, pos){
+    const w=this.W(node), h=this.H(node);
+    const kids=node.collapsed?[]:this.childrenOf(node.id);
+    if(!kids.length){ pos[node.id]={x:x,y:yTop,w:w,h:h}; return h; }
+    const childX=x+w+State.H_GAP; let cy=yTop;
+    kids.forEach(k=>{ const bh=this._lay(k, childX, cy, pos); cy+=bh+State.V_GAP; });
+    const total=cy-State.V_GAP-yTop;
+    pos[node.id]={x:x, y:yTop+total/2-h/2, w:w, h:h};
+    return Math.max(h,total);
+  },
+
+  addChild(parentId){
+    const parent=State.getNode(parentId); if(!parent) return;
+    const snap=mcClone(State.project);
+    const sibs=this.childrenOf(parentId);
+    const y = sibs.length ? (sibs[sibs.length-1].y + this.H(sibs[sibs.length-1]) + State.V_GAP) : parent.y;
+    const n=State.addNode({ parentId:parentId, x:parent.x+this.W(parent)+State.H_GAP, y:y, text:'' });
+    n._fresh=true; if(parent.collapsed) parent.collapsed=false;
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.selectNode(n.id); Nodes.refreshSelection(); Nodes.beginEdit(n.id,'text');
+  },
+  addSibling(refId){
+    const ref=State.getNode(refId); if(!ref) return;
+    if(!ref.parentId || !State.getNode(ref.parentId)){ this.addChild(refId); return; }
+    const snap=mcClone(State.project);
+    const n=State.addNode({ parentId:ref.parentId, x:ref.x, y:ref.y+this.H(ref)+State.V_GAP-0.5, text:'' });
+    n._fresh=true;
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.selectNode(n.id); Nodes.refreshSelection(); Nodes.beginEdit(n.id,'text');
+  },
+  toggleCollapse(id){
+    const n=State.getNode(id); if(!n) return;
+    const snap=mcClone(State.project); n.collapsed=!n.collapsed;
+    History.pushSnapshot(snap); State.touchRender();
+  },
+
+  onDragEnd(id, ev){
+    const node=State.getNode(id); if(!node) return;
+    const banned=new Set([id, ...this.descendants(id)]);
+    const elt=document.elementFromPoint(ev.clientX, ev.clientY);
+    const tgtEl=elt&&elt.closest?elt.closest('.node'):null;
+    if(tgtEl){ const tid=tgtEl.dataset.id;
+      if(!banned.has(tid) && tid!==node.parentId){ node.parentId=tid; const t=State.getNode(tid); if(t&&t.collapsed) t.collapsed=false; }
+    }
+    // y kept at drop position so siblings re-sort by drop order on next relayout
+  }
+};
+</script>

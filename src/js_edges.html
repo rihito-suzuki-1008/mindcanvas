@@ -1,0 +1,132 @@
+<script>
+const NS='http://www.w3.org/2000/svg';
+const Edges = {
+  g:null, branchG:null, paths:{}, branches:{}, labels:{}, selectedId:null,
+  init(){ this.g=document.getElementById('edges-g'); this.branchG=document.getElementById('branch-g'); },
+
+  /* structural parent->child branches (tree mode) */
+  renderBranches(sheet){
+    const present={};
+    for(const id in sheet.nodes){ const n=sheet.nodes[id];
+      if(!n.parentId || !sheet.nodes[n.parentId] || n._hidden) continue;
+      const p=sheet.nodes[n.parentId]; if(p._hidden) continue;
+      const ra=this.nodeRect(n.parentId), rb=this.nodeRect(id); if(!ra||!rb) continue;
+      const p0={x:ra.x+ra.w, y:ra.cy}, p1={x:rb.x, y:rb.cy};
+      const k=Math.max(24,(p1.x-p0.x)*0.5);
+      const d='M'+p0.x+','+p0.y+' C'+(p0.x+k)+','+p0.y+' '+(p1.x-k)+','+p1.y+' '+p1.x+','+p1.y;
+      present[id]=1; let pa=this.branches[id];
+      if(!pa){ pa=document.createElementNS(NS,'path'); pa.setAttribute('class','branch'); pa.setAttribute('fill','none');
+        pa.setAttribute('stroke','#b9c2cf'); pa.setAttribute('stroke-width','2'); this.branchG.appendChild(pa); this.branches[id]=pa; }
+      pa.setAttribute('d',d);
+    }
+    for(const id in this.branches){ if(!present[id]){ this.branches[id].remove(); delete this.branches[id]; } }
+  },
+  clearBranches(){ for(const id in this.branches){ this.branches[id].remove(); delete this.branches[id]; } },
+
+  nodeRect(id){
+    const n=State.getNode(id); if(!n) return null;
+    const el=Nodes.els[id];
+    const w=el?el.offsetWidth:n.w, h=el?el.offsetHeight:(n.h||60);
+    return { x:n.x, y:n.y, w:w, h:h, cx:n.x+w/2, cy:n.y+h/2 };
+  },
+  anchor(r, side){
+    switch(side){ case 't':return{x:r.cx,y:r.y}; case 'b':return{x:r.cx,y:r.y+r.h};
+      case 'l':return{x:r.x,y:r.cy}; default:return{x:r.x+r.w,y:r.cy}; }
+  },
+  normal(side){ return side==='r'?{x:1,y:0}:side==='l'?{x:-1,y:0}:side==='t'?{x:0,y:-1}:{x:0,y:1}; },
+  autoSides(a,b){
+    const dx=b.cx-a.cx, dy=b.cy-a.cy;
+    if(Math.abs(dx)>=Math.abs(dy)) return dx>=0?['r','l']:['l','r'];
+    return dy>=0?['b','t']:['t','b'];
+  },
+  bez(p0,c0,c1,p1,t){ const u=1-t;
+    return { x:u*u*u*p0.x+3*u*u*t*c0.x+3*u*t*t*c1.x+t*t*t*p1.x,
+             y:u*u*u*p0.y+3*u*u*t*c0.y+3*u*t*t*c1.y+t*t*t*p1.y }; },
+
+  geom(e){
+    const ra=this.nodeRect(e.from), rb=this.nodeRect(e.to); if(!ra||!rb) return null;
+    let fs=e.fromSide, ts=e.toSide;
+    if(!fs||!ts){ const auto=this.autoSides(ra,rb); if(!fs) fs=auto[0]; if(!ts) ts=auto[1]; }
+    const p0=this.anchor(ra,fs), p1=this.anchor(rb,ts);
+    const n0=this.normal(fs), n1=this.normal(ts);
+    const dist=Math.hypot(p1.x-p0.x,p1.y-p0.y);
+    const k=e.kind==='curve'?clamp(dist*0.5,80,400):clamp(dist*0.4,30,170);
+    const c0={x:p0.x+n0.x*k, y:p0.y+n0.y*k}, c1={x:p1.x+n1.x*k, y:p1.y+n1.y*k};
+    return { d:'M'+p0.x+','+p0.y+' C'+c0.x+','+c0.y+' '+c1.x+','+c1.y+' '+p1.x+','+p1.y,
+             mid:this.bez(p0,c0,c1,p1,0.5) };
+  },
+
+  render(sheet){
+    const present={};
+    for(const id in sheet.edges){
+      const e=sheet.edges[id];
+      const fa=sheet.nodes[e.from], fb=sheet.nodes[e.to];
+      if(!fa||!fb||fa._hidden||fb._hidden){ this._remove(id); continue; }
+      const g=this.geom(e); if(!g){ this._remove(id); continue; }
+      present[id]=1;
+      let p=this.paths[id];
+      if(!p){ p=document.createElementNS(NS,'path'); p.setAttribute('class','edge'); p.setAttribute('fill','none');
+        p.dataset.id=id;
+        p.addEventListener('pointerdown',(ev)=>{ ev.stopPropagation(); this.select(id); });
+        p.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
+        this.g.appendChild(p); this.paths[id]=p; }
+      p.setAttribute('d',g.d);
+      const sel=this.selectedId===id;
+      p.setAttribute('stroke', sel?'#3b82f6':'#5b6472');
+      p.setAttribute('stroke-width', sel?'3':'2');
+      p.setAttribute('marker-end', e.directed?'url(#arrow)':'');
+      // label
+      if(e.label){ let l=this.labels[id];
+        if(!l){ l=document.createElement('div'); l.className='edge-label'; l.dataset.id=id;
+          l.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
+          Nodes.layer.appendChild(l); this.labels[id]=l; }
+        l.textContent=e.label; l.style.left=g.mid.x+'px'; l.style.top=g.mid.y+'px';
+      } else if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; }
+    }
+    for(const id in this.paths){ if(!present[id]) this._remove(id); }
+  },
+  _remove(id){ if(this.paths[id]){ this.paths[id].remove(); delete this.paths[id]; }
+    if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; } },
+
+  select(id){ this.selectedId=id; if(typeof Selection!=='undefined') Selection.clear(); this.render(State.activeSheet()); Nodes.refreshSelection(); App.updateAlignBar(); },
+  deselect(){ if(this.selectedId){ this.selectedId=null; this.render(State.activeSheet()); } },
+  editLabel(id){
+    const e=State.activeSheet().edges[id]; if(!e) return;
+    const v=window.prompt('接続ラベル', e.label||''); if(v===null) return;
+    const snap=mcClone(State.project); e.label=v; History.pushSnapshot(snap); State.touchRender();
+  },
+  deleteSelected(){
+    if(!this.selectedId) return false;
+    const snap=mcClone(State.project); State.removeEdges([this.selectedId]); this.selectedId=null;
+    History.pushSnapshot(snap); State.touchRender(); return true;
+  },
+
+  /* ---------- create by dragging a handle ---------- */
+  anchorLocal(id, side){ const w=this.anchor(this.nodeRect(id), side); return Canvas.worldToLocal(w.x,w.y); },
+  startLink(e, fromId, side){
+    if(e.button!==0) return;
+    const prev=document.getElementById('link-preview'), path=prev.querySelector('path');
+    prev.hidden=false;
+    const update=(ev)=>{ const a=this.anchorLocal(fromId,side); const r=Canvas.rect();
+      path.setAttribute('d','M'+a.x+','+a.y+' L'+(ev.clientX-r.left)+','+(ev.clientY-r.top)); };
+    const up=(ev)=>{
+      window.removeEventListener('pointermove',update); window.removeEventListener('pointerup',up);
+      prev.hidden=true;
+      const elt=document.elementFromPoint(ev.clientX,ev.clientY);
+      const nodeEl=elt&&elt.closest?elt.closest('.node'):null;
+      const snap=mcClone(State.project);
+      if(nodeEl && nodeEl.dataset.id!==fromId){
+        State.addEdge(fromId, nodeEl.dataset.id, {fromSide:side});
+        History.pushSnapshot(snap); State.touchRender();
+      } else if(!nodeEl){
+        const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
+        const nn=State.addNode({ x:Canvas.snap(w.x-State.NODE_W/2), y:Canvas.snap(w.y-20), text:'' }); nn._fresh=true;
+        State.addEdge(fromId, nn.id, {fromSide:side});
+        History.pushSnapshot(snap); State.touchRender();
+        Selection.selectNode(nn.id); Nodes.refreshSelection(); Nodes.beginEdit(nn.id,'text');
+      }
+    };
+    window.addEventListener('pointermove',update); window.addEventListener('pointerup',up); update(e);
+  }
+};
+</script>

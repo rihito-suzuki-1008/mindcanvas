@@ -1,0 +1,41 @@
+<script>
+const Minimap = {
+  canvas:null, ctx:null, _t:null,
+  init(){
+    this.canvas=document.getElementById('minimap'); this.ctx=this.canvas.getContext('2d');
+    const nav=(e)=>{ if(!this._t) return; const r=this.canvas.getBoundingClientRect();
+      const cx=e.clientX-r.left, cy=e.clientY-r.top;
+      const wx=this._t.minX+(cx-this._t.offX)/this._t.scale, wy=this._t.minY+(cy-this._t.offY)/this._t.scale;
+      Canvas.centerOn(wx,wy); };
+    this.canvas.addEventListener('pointerdown',(e)=>{ e.stopPropagation(); nav(e);
+      const move=(ev)=>nav(ev); const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); };
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up); });
+  },
+  draw(){
+    if(!this.ctx||!State.project) return;
+    const cv=this.canvas, ctx=this.ctx; ctx.clearRect(0,0,cv.width,cv.height);
+    const s=State.activeSheet(); const b=Canvas.contentBBox(); const r=Canvas.rect();
+    const tl=Canvas.screenToWorld(r.left,r.top), br=Canvas.screenToWorld(r.left+r.width,r.top+r.height);
+    let minX,minY,maxX,maxY;
+    if(b){ minX=Math.min(b.x,tl.x); minY=Math.min(b.y,tl.y); maxX=Math.max(b.x+b.w,br.x); maxY=Math.max(b.y+b.h,br.y); }
+    else { minX=tl.x; minY=tl.y; maxX=br.x; maxY=br.y; }
+    const pad=40; minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+    const ww=Math.max(1,maxX-minX), wh=Math.max(1,maxY-minY);
+    const scale=Math.min(cv.width/ww, cv.height/wh);
+    const offX=(cv.width-ww*scale)/2, offY=(cv.height-wh*scale)/2;
+    this._t={minX,minY,scale,offX,offY};
+    const X=(wx)=>offX+(wx-minX)*scale, Y=(wy)=>offY+(wy-minY)*scale;
+    // sections
+    ctx.strokeStyle='#9aa7bd'; ctx.lineWidth=1;
+    for(const id in s.sections){ const c=s.sections[id]; ctx.strokeRect(X(c.x),Y(c.y),c.w*scale,c.h*scale); }
+    // nodes
+    ctx.fillStyle='#9fb0c9';
+    for(const id in s.nodes){ const n=s.nodes[id]; if(n._hidden) continue; const el=Nodes.els[id];
+      const w=el?el.offsetWidth:n.w, h=el?el.offsetHeight:(n.h||60);
+      ctx.fillRect(X(n.x),Y(n.y),Math.max(2,w*scale),Math.max(2,h*scale)); }
+    // viewport
+    ctx.strokeStyle='#3b82f6'; ctx.lineWidth=1.5;
+    ctx.strokeRect(X(tl.x),Y(tl.y),(br.x-tl.x)*scale,(br.y-tl.y)*scale);
+  }
+};
+</script>

@@ -1,0 +1,106 @@
+<script>
+const Exporter = {
+  fname(extra){ const s=(State.project.name||'mindcanvas').replace(/[\\/:*?"<>|]/g,'_'); return extra?s+'_'+extra:s; },
+  label(n){ let t=((n.text||'').split('\n')[0]||'').trim();
+    t=t.replace(/^#{1,6}\s*/,'').replace(/^[-*+]\s+/,'').replace(/\*\*/g,'').replace(/`/g,'').trim();
+    return t||'(空)'; },
+  childrenIn(sheet,id){ const out=[]; for(const k in sheet.nodes){ if(sheet.nodes[k].parentId===id) out.push(sheet.nodes[k]); } out.sort((a,b)=>a.y-b.y); return out; },
+  rootsIn(sheet){ const out=[]; for(const id in sheet.nodes){ const n=sheet.nodes[id]; if(!n.parentId||!sheet.nodes[n.parentId]) out.push(n); } out.sort((a,b)=>a.y-b.y); return out; },
+
+  run(kind){
+    if(kind==='png') this.png();
+    else if(kind==='pdf') this.pdf();
+    else if(kind==='md') this.showText('Markdown エクスポート', this.markdown(), 'md');
+    else if(kind==='mermaid') this.showText('Mermaid エクスポート（現在のシート）', this.mermaid(), 'mmd');
+  },
+
+  /* ---------- raster capture ---------- */
+  capture(){
+    return new Promise((resolve)=>{
+      if(!window.htmlToImage){ App.toast('画像ライブラリ未読込'); return resolve(null); }
+      const stage=Canvas.stage; const vp0=mcClone(Canvas.vp());
+      Nodes.commitEdit(); Selection.clear(); Selection.refresh(); Edges.deselect();
+      Canvas.fit();
+      stage.classList.add('exporting');
+      setTimeout(()=>{
+        const restore=()=>{ stage.classList.remove('exporting'); const v=Canvas.vp(); v.x=vp0.x; v.y=vp0.y; v.zoom=vp0.zoom; Canvas.apply(); };
+        window.htmlToImage.toPng(stage,{pixelRatio:2, backgroundColor:'#ffffff', cacheBust:true})
+          .then((url)=>{ restore(); resolve(url); })
+          .catch(()=>{ restore(); App.toast('画像化に失敗しました'); resolve(null); });
+      },200);
+    });
+  },
+  async png(){ const data=await this.capture(); if(data) this.downloadURL(data, this.fname('')+'.png'); },
+  async pdf(){
+    const data=await this.capture(); if(!data) return;
+    if(!window.jspdf){ App.toast('PDFライブラリ未読込'); return; }
+    const img=new Image();
+    img.onload=()=>{ const {jsPDF}=window.jspdf; const w=img.width*0.5, h=img.height*0.5;
+      const pdf=new jsPDF({orientation:w>=h?'landscape':'portrait', unit:'pt', format:[w,h]});
+      pdf.addImage(data,'PNG',0,0,w,h); pdf.save(this.fname('')+'.pdf'); };
+    img.src=data;
+  },
+
+  /* ---------- markdown (whole project) ---------- */
+  markdown(){
+    const p=State.project; const L=['# '+(p.name||'MindCanvas'),''];
+    p.sheets.forEach(sh=>{
+      L.push('## '+sh.name,'');
+      if(p.mode==='tree'){
+        this.rootsIn(sh).forEach(r=>this._walk(sh,r,0,L));
+      } else {
+        for(const id in sh.nodes){ const n=sh.nodes[id]; L.push('- '+this.label(n));
+          if(n.memo) n.memo.split('\n').forEach(m=>L.push('  > '+m)); }
+        const es=Object.values(sh.edges);
+        if(es.length){ L.push('','**接続**','');
+          es.forEach(e=>{ const a=sh.nodes[e.from], b=sh.nodes[e.to]; if(a&&b)
+            L.push('- '+this.label(a)+' → '+this.label(b)+(e.label?' : '+e.label:'')); }); }
+      }
+      L.push('');
+    });
+    return L.join('\n');
+  },
+  _walk(sheet,node,depth,L){
+    L.push('  '.repeat(depth)+'- '+this.label(node));
+    if(node.memo) node.memo.split('\n').forEach(m=>L.push('  '.repeat(depth+1)+'> '+m));
+    this.childrenIn(sheet,node.id).forEach(c=>this._walk(sheet,c,depth+1,L));
+  },
+
+  /* ---------- mermaid (active sheet) ---------- */
+  mermaid(){
+    const p=State.project, sh=State.activeSheet();
+    const sid=(id)=>'n_'+id.replace(/[^a-zA-Z0-9_]/g,'');
+    const tx=(n)=>this.label(n).replace(/"/g,"'").replace(/[\[\]]/g,'');
+    const L=['flowchart LR'];
+    for(const id in sh.nodes){ const n=sh.nodes[id]; L.push('  '+sid(id)+'["'+tx(n)+'"]'); }
+    if(p.mode==='tree'){
+      for(const id in sh.nodes){ const n=sh.nodes[id]; if(n.parentId&&sh.nodes[n.parentId]) L.push('  '+sid(n.parentId)+' --> '+sid(id)); }
+    }
+    for(const eid in sh.edges){ const e=sh.edges[eid]; if(sh.nodes[e.from]&&sh.nodes[e.to])
+      L.push('  '+sid(e.from)+(e.label?' -->|'+e.label.replace(/"/g,"'")+'| ':' --> ')+sid(e.to)); }
+    return L.join('\n');
+  },
+
+  /* ---------- helpers ---------- */
+  downloadURL(url, filename){ const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); },
+  downloadText(text, filename, mime){ const blob=new Blob([text],{type:mime||'text/plain'}); const url=URL.createObjectURL(blob);
+    this.downloadURL(url,filename); setTimeout(()=>URL.revokeObjectURL(url),1000); },
+
+  showText(title, text, ext){
+    const root=document.getElementById('modal-root');
+    const mask=document.createElement('div'); mask.className='modal-mask';
+    mask.innerHTML='<div class="modal" style="width:560px">'+
+      '<h2>'+title+'</h2>'+
+      '<textarea class="txt" style="height:300px;font-family:ui-monospace,Menlo,monospace;font-size:12px" readonly></textarea>'+
+      '<div class="modal-actions"><button class="btn" data-x="copy">コピー</button>'+
+      '<button class="btn" data-x="dl">ダウンロード(.'+ext+')</button>'+
+      '<button class="btn btn-primary" data-x="close">閉じる</button></div></div>';
+    const ta=mask.querySelector('textarea'); ta.value=text;
+    mask.querySelector('[data-x="copy"]').onclick=()=>{ ta.select(); try{ document.execCommand('copy'); App.toast('コピーしました'); }catch(e){} };
+    mask.querySelector('[data-x="dl"]').onclick=()=>this.downloadText(text, this.fname('')+'.'+ext, ext==='md'?'text/markdown':'text/plain');
+    mask.querySelector('[data-x="close"]').onclick=()=>mask.remove();
+    mask.addEventListener('pointerdown',(e)=>{ if(e.target===mask) mask.remove(); });
+    root.appendChild(mask);
+  }
+};
+</script>

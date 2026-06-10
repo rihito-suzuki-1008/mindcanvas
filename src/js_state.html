@@ -1,0 +1,112 @@
+<script>
+/* ===== util ===== */
+function uid(p){ return (p||'id')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function mcClone(o){ return JSON.parse(JSON.stringify(o)); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function debounce(fn,ms){ let t; return function(){ const a=arguments,c=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(c,a); },ms); }; }
+function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ===== state ===== */
+const State = {
+  project:null,
+  GRID:20, NODE_W:200, H_GAP:64, V_GAP:18,
+
+  activeSheet(){
+    const p=this.project; if(!p) return null;
+    return p.sheets.find(s=>s.id===p.activeSheetId) || p.sheets[0];
+  },
+  prefs(){ return this.project ? (this.project.prefs || (this.project.prefs={grid:true,snap:true})) : {grid:true,snap:true}; },
+
+  mkNode(props){
+    return Object.assign({
+      id:uid('n'), x:0, y:0, w:this.NODE_W, h:0,
+      text:'アイデア', memo:'', parentId:null, collapsed:false, groupId:null
+    }, props||{});
+  },
+  blankSheet(id,name,mode){
+    const sheet={ id:id||uid('sh'), name:name||'シート1', nodes:{}, edges:{}, sections:{}, viewport:{x:120,y:90,zoom:1} };
+    if(mode==='tree'){
+      const root=this.mkNode({ x:80, y:300, text:'# 中心テーマ' });
+      sheet.nodes[root.id]=root;
+    }
+    return sheet;
+  },
+  newProject(name,mode){
+    const sid=uid('sh');
+    return {
+      id:uid('pj'), name:name||'無題のプロジェクト', mode:(mode==='tree'?'tree':'freeform'),
+      createdAt:Date.now(), updatedAt:Date.now(), activeSheetId:sid,
+      prefs:{grid:true, snap:true},
+      sheets:[ this.blankSheet(sid,'シート1',mode) ]
+    };
+  },
+
+  /* sheets */
+  addSheet(name){
+    const p=this.project; if(!p) return;
+    const s=this.blankSheet(uid('sh'), name||('シート'+(p.sheets.length+1)), p.mode);
+    this.commit(()=>{ p.sheets.push(s); p.activeSheetId=s.id; });
+    return s;
+  },
+  removeSheet(id){
+    const p=this.project; if(!p||p.sheets.length<=1) return;
+    this.commit(()=>{
+      p.sheets=p.sheets.filter(s=>s.id!==id);
+      if(p.activeSheetId===id) p.activeSheetId=p.sheets[0].id;
+    });
+  },
+  renameSheet(id,name){
+    const p=this.project; if(!p) return;
+    const s=p.sheets.find(x=>x.id===id); if(!s) return;
+    this.commit(()=>{ s.name=name; });
+  },
+  setActiveSheet(id){
+    const p=this.project; if(!p||p.activeSheetId===id) return;
+    p.activeSheetId=id; this.touch();
+    if(typeof Selection!=='undefined') Selection.clear();
+    App.render(); Canvas.apply();
+  },
+
+  /* nodes */
+  addNode(props){
+    const s=this.activeSheet(); if(!s) return null;
+    const n=this.mkNode(props); s.nodes[n.id]=n; return n;
+  },
+  getNode(id){ const s=this.activeSheet(); return s?s.nodes[id]:null; },
+  removeNodes(ids){
+    const s=this.activeSheet(); if(!s) return;
+    const set=new Set(ids);
+    // also remove descendants in tree mode
+    if(this.project.mode==='tree'){
+      let added=true;
+      while(added){ added=false;
+        for(const id in s.nodes){ const n=s.nodes[id];
+          if(n.parentId && set.has(n.parentId) && !set.has(id)){ set.add(id); added=true; } } }
+    }
+    set.forEach(id=>{ delete s.nodes[id]; });
+    for(const eid in s.edges){ const e=s.edges[eid]; if(set.has(e.from)||set.has(e.to)) delete s.edges[eid]; }
+  },
+
+  /* edges */
+  addEdge(from,to,opts){
+    const s=this.activeSheet(); if(!s||from===to) return null;
+    for(const eid in s.edges){ const e=s.edges[eid]; if(e.from===from&&e.to===to) return e; }
+    const e=Object.assign({ id:uid('e'), from:from, to:to, fromSide:null, toSide:null, kind:'straight', label:'', directed:true }, opts||{});
+    s.edges[e.id]=e; return e;
+  },
+  removeEdges(ids){ const s=this.activeSheet(); if(!s) return; ids.forEach(id=>delete s.edges[id]); },
+
+  /* sections */
+  addSection(props){
+    const s=this.activeSheet(); if(!s) return null;
+    const sec=Object.assign({ id:uid('sec'), x:0,y:0,w:300,h:200, title:'セクション' }, props||{});
+    s.sections[sec.id]=sec; return sec;
+  },
+  removeSections(ids){ const s=this.activeSheet(); if(!s) return; ids.forEach(id=>delete s.sections[id]); },
+
+  /* commit / persistence hooks */
+  touch(){ if(this.project){ this.project.updatedAt=Date.now(); Store.scheduleSave(); } },
+  commit(fn){ History.push(); fn(); this.touch(); App.render(); },
+  touchRender(){ this.touch(); App.render(); }
+};
+</script>

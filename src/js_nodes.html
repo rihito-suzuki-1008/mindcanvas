@@ -1,0 +1,178 @@
+<script>
+const Nodes = {
+  layer:null, els:{}, editingId:null, _editor:null, _which:'text', _editSnap:null, _editOld:'',
+  init(){ this.layer=document.getElementById('nodes-layer'); },
+
+  md(text){
+    if(window.marked && window.DOMPurify){
+      try{ return DOMPurify.sanitize(marked.parse(text||'',{breaks:true,gfm:true})); }catch(e){}
+    }
+    return escAttr(text).replace(/\n/g,'<br>');
+  },
+  hasChildren(id){ const s=State.activeSheet(); for(const k in s.nodes){ if(s.nodes[k].parentId===id) return true; } return false; },
+  childCount(id){ const s=State.activeSheet(); let c=0; for(const k in s.nodes){ if(s.nodes[k].parentId===id) c++; } return c; },
+
+  render(sheet){
+    const present={};
+    for(const id in sheet.nodes){
+      const n=sheet.nodes[id];
+      if(n._hidden){ if(this.els[id]){ this.els[id].remove(); delete this.els[id]; } continue; }
+      present[id]=1; this.renderOne(n);
+    }
+    for(const id in this.els){ if(!present[id]){ this.els[id].remove(); delete this.els[id]; } }
+  },
+
+  renderOne(n){
+    let el=this.els[n.id];
+    if(!el){
+      el=document.createElement('div'); el.className='node'; el.dataset.id=n.id;
+      el.innerHTML=
+        '<div class="node-md"></div>'+
+        '<div class="node-memo" hidden></div>'+
+        '<div class="handle t" data-side="t"></div><div class="handle r" data-side="r"></div>'+
+        '<div class="handle b" data-side="b"></div><div class="handle l" data-side="l"></div>'+
+        '<button class="collapse-toggle" hidden></button>'+
+        '<div class="grip"></div>';
+      el.addEventListener('pointerdown',(e)=>this.onNodePointerDown(e,n.id));
+      el.addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.beginEdit(n.id,'text'); });
+      el.querySelectorAll('.handle').forEach(h=>h.addEventListener('pointerdown',(e)=>{
+        e.stopPropagation(); Edges.startLink(e,n.id,h.dataset.side);
+      }));
+      el.querySelector('.grip').addEventListener('pointerdown',(e)=>this.startResize(e,n.id));
+      el.querySelector('.node-memo').addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.beginEdit(n.id,'memo'); });
+      el.querySelector('.collapse-toggle').addEventListener('pointerdown',(e)=>{ e.stopPropagation(); });
+      el.querySelector('.collapse-toggle').addEventListener('click',(e)=>{ e.stopPropagation(); Tree.toggleCollapse(n.id); });
+      this.layer.appendChild(el); this.els[n.id]=el;
+    }
+    if(this.editingId!==n.id){
+      el.querySelector('.node-md').innerHTML=this.md(n.text);
+      const memo=el.querySelector('.node-memo');
+      if(n.memo){ memo.hidden=false; memo.textContent=n.memo; } else memo.hidden=true;
+    }
+    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px';
+    el.classList.toggle('selected', Selection.hasNode(n.id));
+    // tree collapse toggle
+    const tg=el.querySelector('.collapse-toggle');
+    if(State.project.mode==='tree' && this.hasChildren(n.id)){
+      tg.hidden=false; tg.textContent=n.collapsed?'+':'−';
+      tg.style.right='-9px'; tg.style.top='50%'; tg.style.transform='translateY(-50%)';
+      el.classList.toggle('collapsed-parent', !!n.collapsed);
+      if(n.collapsed) el.dataset.count=this.childCount(n.id); else el.removeAttribute('data-count');
+    } else { tg.hidden=true; el.classList.remove('collapsed-parent'); el.removeAttribute('data-count'); }
+  },
+
+  applyPositions(){
+    const s=State.activeSheet(); if(!s) return;
+    for(const id in this.els){ const n=s.nodes[id]; if(!n) continue;
+      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; }
+  },
+  refreshSelection(){ for(const id in this.els){ this.els[id].classList.toggle('selected', Selection.hasNode(id)); } },
+
+  /* ---------- editing ---------- */
+  beginEdit(id, which){
+    if(this.editingId) this.commitEdit();
+    const n=State.getNode(id); if(!n) return;
+    this.editingId=id; this._which=which||'text'; this._editSnap=mcClone(State.project);
+    const el=this.els[id]; if(!el) return;
+    const cur=this._which==='memo'?(n.memo||''):n.text;
+    this._editOld=cur;
+    const ta=document.createElement('textarea');
+    ta.className='node-editor'+(this._which==='memo'?' memo':'');
+    ta.value=cur; ta.style.width='100%';
+    if(this._which==='memo'){ el.querySelector('.node-memo').hidden=true; el.appendChild(ta); }
+    else { el.querySelector('.node-md').style.display='none'; el.insertBefore(ta, el.firstChild); }
+    const fit=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
+    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ Tree.relayout(); this.applyPositions(); Edges.render(State.activeSheet()); } });
+    ta.addEventListener('keydown',(ev)=>this.onEditKey(ev,id));
+    ta.addEventListener('blur',()=>this.commitEdit());
+    this._editor=ta;
+    setTimeout(()=>{ ta.focus(); fit(); if(n._fresh){ ta.select(); delete n._fresh; } else ta.setSelectionRange(ta.value.length,ta.value.length); },0);
+  },
+  onEditKey(ev,id){
+    // エディタ内のキーは常にグローバルショートカットへ伝播させない（Enter 連鎖で枝分かれするのを防ぐ）
+    ev.stopPropagation();
+    // (1) IME 変換中の Enter/Tab はノード操作に使わない（日本語変換の確定 Enter で枝分かれさせない）
+    if(ev.isComposing || ev.keyCode===229){ return; }
+    const tree=State.project.mode==='tree';
+    if(ev.key==='Escape'){ ev.preventDefault(); this._editor.value=this._editOld; this._editor.blur(); return; }
+    // (2) 編集を確定して選択モードへ戻る（枝分かれしない）: ツリー本文の Enter、または全モードの Ctrl/Cmd+Enter
+    if(ev.key==='Enter' && !ev.shiftKey && ((tree && this._which==='text') || ev.ctrlKey || ev.metaKey)){
+      ev.preventDefault(); this.commitEdit(); Selection.selectNode(id); return;
+    }
+    // ツリー: Tab で子追加
+    if(tree && this._which==='text' && ev.key==='Tab'){ ev.preventDefault(); this.commitEdit(); Tree.addChild(id); return; }
+  },
+  commitEdit(){
+    if(!this.editingId) return;
+    const id=this.editingId, n=State.getNode(id), ta=this._editor;
+    const val=ta?ta.value:null;
+    this.editingId=null; this._editor=null;
+    if(ta&&ta.parentNode) ta.parentNode.removeChild(ta);
+    const el=this.els[id]; if(el){ const md=el.querySelector('.node-md'); if(md) md.style.display=''; }
+    if(n && val!=null && val!==this._editOld){
+      History.pushSnapshot(this._editSnap);
+      if(this._which==='memo') n.memo=val; else n.text=val;
+      State.touchRender();
+    } else { App.render(); }
+    this._editSnap=null;
+  },
+
+  /* ---------- create ---------- */
+  createAt(wx,wy,opts){
+    const snap=mcClone(State.project);
+    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-State.NODE_W/2), y:Canvas.snap(wy-20), text:'' }, opts||{}));
+    n._fresh=true;
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.selectNode(n.id); this.refreshSelection();
+    this.beginEdit(n.id,'text');
+    return n;
+  },
+
+  /* ---------- drag ---------- */
+  onNodePointerDown(e,id){
+    if(App.spaceDown||e.button===1) return;
+    if(e.button!==0) return;
+    if(this.editingId && this.editingId!==id) this.commitEdit();
+    e.stopPropagation();
+    if(e.shiftKey){ Selection.toggleNode(id); }
+    else if(!Selection.hasNode(id)){ Selection.selectNode(id); }
+    Edges.deselect(); App.updateAlignBar(); this.refreshSelection();
+    if(!Selection.hasNode(id)) return;
+
+    const tree=State.project.mode==='tree';
+    const start=Canvas.screenToWorld(e.clientX,e.clientY);
+    let ids=Selection.nodeIds();
+    if(tree){ const set=new Set(ids); ids.forEach(nid=>Tree.descendants(nid).forEach(d=>set.add(d))); ids=[...set]; }
+    const starts={}; ids.forEach(nid=>{ const nn=State.getNode(nid); starts[nid]={x:nn.x,y:nn.y}; });
+    const snap=mcClone(State.project); let moved=false;
+    const move=(ev)=>{
+      const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
+      const dx=w.x-start.x, dy=w.y-start.y;
+      if(!moved && Math.abs(dx)+Math.abs(dy)<2) return; moved=true;
+      ids.forEach(nid=>{ const nn=State.getNode(nid); nn.x=starts[nid].x+dx; nn.y=starts[nid].y+dy; });
+      this.applyPositions(); Edges.render(State.activeSheet()); if(typeof Minimap!=='undefined') Minimap.draw();
+    };
+    const up=(ev)=>{
+      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      if(!moved) return;
+      const pf=State.prefs();
+      if(pf.snap) ids.forEach(nid=>{ const nn=State.getNode(nid); nn.x=Canvas.snap(nn.x); nn.y=Canvas.snap(nn.y); });
+      if(tree) Tree.onDragEnd(id, ev);
+      History.pushSnapshot(snap); State.touchRender();
+    };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  },
+
+  startResize(e,id){
+    e.stopPropagation(); if(e.button!==0) return;
+    const n=State.getNode(id); const start=Canvas.screenToWorld(e.clientX,e.clientY); const w0=n.w;
+    const snap=mcClone(State.project); let moved=false;
+    const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY); n.w=Math.max(120,w0+(w.x-start.x)); moved=true;
+      if(State.project.mode==='tree'){ Tree.relayout(); }
+      this.applyPositions(); Edges.render(State.activeSheet()); };
+    const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      if(moved){ if(State.prefs().snap) n.w=Math.max(120,Canvas.snap(n.w)); History.pushSnapshot(snap); State.touchRender(); } };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  }
+};
+</script>

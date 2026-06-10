@@ -1,0 +1,107 @@
+<script>
+const Store = {
+  IDX:'mc:index', PFX:'mc:project:',
+  _saveT:null, _durT:null, backend:'local',  // 'drive' | 'sheet' | 'local'
+
+  gas(){ return typeof google!=='undefined' && google.script && google.script.run; },
+
+  /* ---- backend selection (probe at startup) ---- */
+  initBackend(cb){
+    if(!this.gas()){ this.backend='local'; this.setStatus('local'); cb&&cb(); return; }
+    google.script.run
+      .withSuccessHandler((p)=>{
+        this.backend = (p&&p.drive)?'drive':((p&&p.sheet)?'sheet':'local');
+        this.setStatus(this.backend==='local'?'local':'synced'); cb&&cb();
+      })
+      .withFailureHandler(()=>{ this.backend='local'; this.setStatus('local'); cb&&cb(); })
+      .probeDurable();
+  },
+
+  /* ---- local ---- */
+  listLocal(){ try{ return JSON.parse(localStorage.getItem(this.IDX)||'[]'); }catch(e){ return []; } },
+  _writeIndex(arr){ localStorage.setItem(this.IDX, JSON.stringify(arr)); },
+  _meta(p){ return { id:p.id, name:p.name, mode:p.mode, createdAt:p.createdAt, updatedAt:p.updatedAt }; },
+  upsertIndex(p){ const arr=this.listLocal(); const i=arr.findIndex(x=>x.id===p.id);
+    if(i>=0) arr[i]=this._meta(p); else arr.push(this._meta(p)); this._writeIndex(arr); },
+  loadLocal(id){ try{ const s=localStorage.getItem(this.PFX+id); return s?JSON.parse(s):null; }catch(e){ return null; } },
+  saveLocalNow(p){ if(!p) return; localStorage.setItem(this.PFX+p.id, JSON.stringify(p)); this.upsertIndex(p); },
+  removeLocal(id){ localStorage.removeItem(this.PFX+id); this._writeIndex(this.listLocal().filter(x=>x.id!==id)); },
+  saveAndBackup(p){ this.saveLocalNow(p); this._durableSave(p); },
+
+  /* ---- durable backend dispatch (drive | sheet) ---- */
+  _durableSave(p, onOk, onErr){
+    if(this.backend==='local' || !this.gas()){ onErr&&onErr(); return; }
+    const json=JSON.stringify(p);
+    const run=google.script.run.withSuccessHandler(onOk||(()=>{})).withFailureHandler(onErr||(()=>{}));
+    if(this.backend==='drive') run.driveSave(p.id, json);
+    else run.sheetSave(p.id, json, p.name, p.mode, p.updatedAt);
+  },
+  _durableLoad(id, cb){
+    if(this.backend==='local' || !this.gas()){ cb(null); return; }
+    const run=google.script.run.withSuccessHandler(cb).withFailureHandler(()=>cb(null));
+    if(this.backend==='drive') run.driveLoad(id); else run.sheetLoad(id);
+  },
+  _durableList(cb){
+    if(this.backend==='local' || !this.gas()){ cb([]); return; }
+    const run=google.script.run.withSuccessHandler((l)=>cb(l||[])).withFailureHandler(()=>cb([]));
+    if(this.backend==='drive') run.driveList(); else run.sheetList();
+  },
+  _durableDelete(id){
+    if(this.backend==='local' || !this.gas()) return;
+    const run=google.script.run.withFailureHandler(()=>{});
+    if(this.backend==='drive') run.driveDelete(id); else run.sheetDelete(id);
+  },
+
+  /* ---- save pipeline ---- */
+  scheduleSave(){
+    this.setStatus('saving');
+    clearTimeout(this._saveT);
+    this._saveT=setTimeout(()=>{ this.saveLocalNow(State.project); this.scheduleDurableSync(); },350);
+  },
+  scheduleDurableSync(){
+    if(this.backend==='local' || !this.gas()){ this.setStatus('local'); return; }
+    clearTimeout(this._durT);
+    this._durT=setTimeout(()=>this.durableSyncNow(),2200);
+  },
+  durableSyncNow(){
+    if(!State.project) return;
+    this.setStatus('saving');
+    this._durableSave(State.project, ()=>this.setStatus('synced'), ()=>this.setStatus('error'));
+  },
+
+  /* ---- delete ---- */
+  deleteProject(id){ this.removeLocal(id); this._durableDelete(id); },
+
+  /* ---- load / merge ---- */
+  loadProject(id, cb){
+    const local=this.loadLocal(id);
+    if(this.backend==='local' || !this.gas()){ cb(local); return; }
+    this._durableLoad(id, (json)=>{
+      let remote=null; try{ remote=json?JSON.parse(json):null; }catch(e){}
+      if(remote && (!local || (remote.updatedAt||0)>(local.updatedAt||0))){ this.saveLocalNow(remote); cb(remote); }
+      else cb(local);
+    });
+  },
+  // merge durable backend index into local (called on home open)
+  refreshFromDrive(cb){
+    if(this.backend==='local' || !this.gas()){ cb&&cb(); return; }
+    this._durableList((list)=>{
+      const local=this.listLocal(); const lm={}; local.forEach(m=>lm[m.id]=m);
+      const needs=(list||[]).filter(r=>!lm[r.id] || (r.updatedAt||0)>(lm[r.id].updatedAt||0));
+      let pending=needs.length; if(!pending){ cb&&cb(); return; }
+      needs.forEach(r=>this._durableLoad(r.id,(json)=>{
+        try{ const p=JSON.parse(json); if(p&&p.id) this.saveLocalNow(p); }catch(e){}
+        if(--pending<=0) cb&&cb();
+      }));
+    });
+  },
+
+  /* ---- status pill ---- */
+  setStatus(kind){
+    const el=document.getElementById('sync-status'); if(!el) return;
+    const be=this.backend==='drive'?' (Drive)':this.backend==='sheet'?' (シート)':'';
+    el.className='sync-status '+(kind==='error'?'error':(kind==='saving'?'saving':'synced'));
+    el.textContent = kind==='saving'?'保存中…' : kind==='synced'?('✓ 同期済み'+be) : kind==='local'?'✓ ローカルのみ' : kind==='error'?'⚠ 同期失敗':'—';
+  }
+};
+</script>

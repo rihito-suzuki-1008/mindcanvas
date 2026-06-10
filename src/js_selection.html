@@ -1,0 +1,90 @@
+<script>
+const Selection = {
+  nodes:new Set(), sections:new Set(),
+
+  size(id){ const n=State.getNode(id); const el=Nodes.els[id];
+    return { w:el?el.offsetWidth:n.w, h:el?el.offsetHeight:(n.h||60) }; },
+  groupPeers(id){ const n=State.getNode(id); if(!n||!n.groupId) return [id];
+    const s=State.activeSheet(), out=[]; for(const k in s.nodes){ if(s.nodes[k].groupId===n.groupId) out.push(k); } return out; },
+
+  hasNode(id){ return this.nodes.has(id); },
+  hasSection(id){ return this.sections.has(id); },
+  nodeIds(){ return [...this.nodes]; },
+  sectionIds(){ return [...this.sections]; },
+
+  clear(){ this.nodes.clear(); this.sections.clear(); },
+  refresh(){ Nodes.refreshSelection(); if(State.activeSheet()) Sections.render(State.activeSheet()); App.updateAlignBar(); },
+
+  selectNode(id){ this.clear(); this.groupPeers(id).forEach(p=>this.nodes.add(p)); Edges.deselect(); this.refresh(); },
+  toggleNode(id){ const peers=this.groupPeers(id);
+    if(this.nodes.has(id)) peers.forEach(p=>this.nodes.delete(p)); else peers.forEach(p=>this.nodes.add(p));
+    this.refresh(); },
+  selectSection(id){ this.clear(); this.sections.add(id); Edges.deselect(); this.refresh(); },
+  toggleSection(id){ if(this.sections.has(id)) this.sections.delete(id); else this.sections.add(id); this.refresh(); },
+  selectAll(){ const s=State.activeSheet(); this.clear(); for(const id in s.nodes){ if(!s.nodes[id]._hidden) this.nodes.add(id); } Edges.deselect(); this.refresh(); },
+
+  prune(){ const s=State.activeSheet(); if(!s) return;
+    this.nodes.forEach(id=>{ if(!s.nodes[id]) this.nodes.delete(id); });
+    this.sections.forEach(id=>{ if(!s.sections[id]) this.sections.delete(id); }); },
+
+  deleteSelected(){
+    if(Edges.deleteSelected()) return;
+    if(!this.nodes.size && !this.sections.size) return;
+    const snap=mcClone(State.project);
+    if(this.nodes.size) State.removeNodes([...this.nodes]);
+    if(this.sections.size) State.removeSections([...this.sections]);
+    this.clear(); History.pushSnapshot(snap); State.touchRender();
+  },
+
+  /* ---------- grouping ---------- */
+  group(){ if(this.nodes.size<2) return; const snap=mcClone(State.project); const gid=uid('g');
+    this.nodes.forEach(id=>{ const n=State.getNode(id); if(n) n.groupId=gid; });
+    History.pushSnapshot(snap); State.touchRender(); },
+  ungroup(){ if(!this.nodes.size) return; const snap=mcClone(State.project); let any=false;
+    this.nodes.forEach(id=>{ const n=State.getNode(id); if(n&&n.groupId){ n.groupId=null; any=true; } });
+    if(any){ History.pushSnapshot(snap); State.touchRender(); } },
+
+  /* ---------- align / distribute ---------- */
+  align(type){
+    const ids=this.nodeIds(); if(ids.length<2) return;
+    const items=ids.map(id=>{ const n=State.getNode(id); const sz=this.size(id); return {id,n,w:sz.w,h:sz.h}; });
+    const snap=mcClone(State.project);
+    if(type==='left'){ const m=Math.min(...items.map(i=>i.n.x)); items.forEach(i=>i.n.x=m); }
+    else if(type==='right'){ const m=Math.max(...items.map(i=>i.n.x+i.w)); items.forEach(i=>i.n.x=m-i.w); }
+    else if(type==='hcenter'){ const c=items.reduce((a,i)=>a+i.n.x+i.w/2,0)/items.length; items.forEach(i=>i.n.x=c-i.w/2); }
+    else if(type==='top'){ const m=Math.min(...items.map(i=>i.n.y)); items.forEach(i=>i.n.y=m); }
+    else if(type==='bottom'){ const m=Math.max(...items.map(i=>i.n.y+i.h)); items.forEach(i=>i.n.y=m-i.h); }
+    else if(type==='vcenter'){ const c=items.reduce((a,i)=>a+i.n.y+i.h/2,0)/items.length; items.forEach(i=>i.n.y=c-i.h/2); }
+    else if(type==='hdist'){ if(items.length<3) return; items.sort((a,b)=>a.n.x-b.n.x);
+      const left=items[0].n.x, right=items[items.length-1].n.x+items[items.length-1].w;
+      const sumW=items.reduce((a,i)=>a+i.w,0); const gap=(right-left-sumW)/(items.length-1);
+      let cur=left; items.forEach(i=>{ i.n.x=cur; cur+=i.w+gap; }); }
+    else if(type==='vdist'){ if(items.length<3) return; items.sort((a,b)=>a.n.y-b.n.y);
+      const top=items[0].n.y, bot=items[items.length-1].n.y+items[items.length-1].h;
+      const sumH=items.reduce((a,i)=>a+i.h,0); const gap=(bot-top-sumH)/(items.length-1);
+      let cur=top; items.forEach(i=>{ i.n.y=cur; cur+=i.h+gap; }); }
+    History.pushSnapshot(snap); State.touchRender();
+  },
+
+  /* ---------- marquee ---------- */
+  startMarquee(e){
+    const r=Canvas.rect(), mq=document.getElementById('marquee');
+    const sx=e.clientX-r.left, sy=e.clientY-r.top; mq.hidden=false;
+    mq.style.left=sx+'px'; mq.style.top=sy+'px'; mq.style.width='0px'; mq.style.height='0px';
+    const additive=e.shiftKey; const base=new Set(this.nodes);
+    const startW=Canvas.screenToWorld(e.clientX,e.clientY); let moved=false;
+    const move=(ev)=>{ const lx=ev.clientX-r.left, ly=ev.clientY-r.top;
+      mq.style.left=Math.min(sx,lx)+'px'; mq.style.top=Math.min(sy,ly)+'px';
+      mq.style.width=Math.abs(lx-sx)+'px'; mq.style.height=Math.abs(ly-sy)+'px'; moved=true;
+      const endW=Canvas.screenToWorld(ev.clientX,ev.clientY);
+      const x1=Math.min(startW.x,endW.x), y1=Math.min(startW.y,endW.y), x2=Math.max(startW.x,endW.x), y2=Math.max(startW.y,endW.y);
+      const s=State.activeSheet(); const sel=new Set(additive?base:[]);
+      for(const id in s.nodes){ const n=s.nodes[id]; if(n._hidden) continue; const sz=this.size(id);
+        if(n.x<x2 && n.x+sz.w>x1 && n.y<y2 && n.y+sz.h>y1) sel.add(id); }
+      this.nodes=sel; Nodes.refreshSelection(); };
+    const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      mq.hidden=true; if(!moved){ this.clear(); this.refresh(); } else App.updateAlignBar(); };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  }
+};
+</script>

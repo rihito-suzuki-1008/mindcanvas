@@ -1,0 +1,9 @@
+# Build artifacts
+local_preview.html
+
+# clasp credentials
+.clasp.json
+.clasp.json.standalone
+
+# macOS
+.DS_Store

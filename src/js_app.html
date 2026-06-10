@@ -1,0 +1,148 @@
+<script>
+const App = {
+  screen:'home', tool:'select', spaceDown:false, clipboard:null,
+
+  init(){
+    Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Shortcuts.init(); Home.init();
+    this.wireUI();
+    Store.initBackend(()=>Home.show());
+  },
+
+  /* ---------- routing ---------- */
+  enterEditor(p){
+    Nodes.commitEdit();
+    State.project=p; History.reset(); Selection.clear(); Edges.selectedId=null;
+    this.screen='editor';
+    document.getElementById('home').hidden=true;
+    document.getElementById('editor').hidden=false;
+    document.getElementById('project-name').value=p.name||'';
+    this.setTool('select'); this.updateToolbar();
+    this.render();
+    Canvas.fit();
+    Store.setStatus(Store.backend==='local'?'local':'synced');
+  },
+  openProject(id){ Store.loadProject(id,(p)=>{ if(p) this.enterEditor(p); else this.toast('プロジェクトを開けませんでした'); }); },
+  showHome(){ Nodes.commitEdit(); this.closeMenus(); Home.show(); },
+
+  /* ---------- render ---------- */
+  render(){
+    if(!State.project) return;
+    const sheet=State.activeSheet(); if(!sheet) return;
+    if(State.project.mode==='tree'){ Tree.computeVisibility(); Nodes.render(sheet); Tree.relayout(); Nodes.applyPositions(); }
+    else { Nodes.render(sheet); }
+    if(State.project.mode==='tree') Edges.renderBranches(sheet); else Edges.clearBranches();
+    Edges.render(sheet); Sections.render(sheet);
+    Canvas.apply();
+    this.updateSheetTabs(); this.updateAlignBar(); History.update();
+  },
+
+  /* ---------- tools / toolbar ---------- */
+  setTool(t){
+    this.tool=t;
+    const st=Canvas.stage; st.classList.toggle('tool-node',t==='node'); st.classList.toggle('tool-section',t==='section');
+    this.updateToolbar();
+  },
+  updateToolbar(){
+    document.querySelectorAll('.tool[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===this.tool));
+    const pf=State.prefs();
+    const g=document.querySelector('.tool[data-act="grid"]'), s=document.querySelector('.tool[data-act="snap"]');
+    if(g) g.classList.toggle('active', !!pf.grid);
+    if(s) s.classList.toggle('active', !!pf.snap);
+  },
+  updateAlignBar(){ document.getElementById('align-bar').hidden = Selection.nodes.size<2; },
+  closeMenus(){ const m=document.getElementById('export-menu'); if(m) m.hidden=true; },
+
+  /* ---------- sheet tabs ---------- */
+  updateSheetTabs(){
+    const wrap=document.getElementById('sheet-tabs'); if(!wrap) return; wrap.innerHTML='';
+    State.project.sheets.forEach(sh=>{
+      const t=document.createElement('button'); t.className='sheet-tab'+(sh.id===State.project.activeSheetId?' active':'');
+      t.innerHTML='<span class="nm">'+escAttr(sh.name)+'</span>'+(State.project.sheets.length>1?'<span class="x">✕</span>':'');
+      t.querySelector('.nm').onclick=()=>State.setActiveSheet(sh.id);
+      t.querySelector('.nm').ondblclick=()=>{ const v=prompt('シート名',sh.name); if(v!=null) State.renameSheet(sh.id,v.trim()||sh.name); };
+      const x=t.querySelector('.x'); if(x) x.onclick=(e)=>{ e.stopPropagation(); if(confirm('シート「'+sh.name+'」を削除しますか？')) State.removeSheet(sh.id); };
+      wrap.appendChild(t);
+    });
+  },
+
+  /* ---------- clipboard ---------- */
+  copy(){
+    const ids=Selection.nodeIds(); if(!ids.length) return;
+    const s=State.activeSheet(); const idset=new Set(ids);
+    this.clipboard={ nodes:ids.map(id=>mcClone(s.nodes[id])),
+      edges:Object.values(s.edges).filter(e=>idset.has(e.from)&&idset.has(e.to)).map(mcClone) };
+    this.toast(ids.length+'件をコピー');
+  },
+  cut(){ this.copy(); Selection.deleteSelected(); },
+  paste(){
+    if(!this.clipboard||!this.clipboard.nodes.length) return;
+    const snap=mcClone(State.project); const s=State.activeSheet(); const off=30;
+    const map={}, gmap={}; this.clipboard.nodes.forEach(n=>{ map[n.id]=uid('n'); });
+    this.clipboard.nodes.forEach(n=>{ const nn=mcClone(n); nn.id=map[n.id]; nn.x+=off; nn.y+=off;
+      nn.parentId=(n.parentId&&map[n.parentId])?map[n.parentId]:null;
+      if(n.groupId){ gmap[n.groupId]=gmap[n.groupId]||uid('g'); nn.groupId=gmap[n.groupId]; }
+      delete nn._fresh; delete nn._hidden; s.nodes[nn.id]=nn; });
+    this.clipboard.edges.forEach(e=>{ if(map[e.from]&&map[e.to]){ const ne=mcClone(e); ne.id=uid('e'); ne.from=map[e.from]; ne.to=map[e.to]; s.edges[ne.id]=ne; } });
+    History.pushSnapshot(snap); State.touchRender();
+    Selection.clear(); Object.values(map).forEach(id=>Selection.nodes.add(id)); Selection.refresh();
+    this.toast('貼り付けました');
+  },
+
+  /* ---------- toast ---------- */
+  toast(msg){
+    let t=document.getElementById('mc-toast');
+    if(!t){ t=document.createElement('div'); t.id='mc-toast'; t.className='toast'; document.body.appendChild(t); }
+    t.textContent=msg; t.classList.add('show'); clearTimeout(this._tt);
+    this._tt=setTimeout(()=>t.classList.remove('show'),1600);
+  },
+
+  /* ---------- UI wiring ---------- */
+  wireUI(){
+    document.getElementById('btn-home').onclick=()=>this.showHome();
+    document.getElementById('btn-search').onclick=()=>Search.open();
+    document.getElementById('sheet-add').onclick=()=>State.addSheet();
+
+    const pn=document.getElementById('project-name');
+    pn.addEventListener('input',()=>{ if(State.project){ State.project.name=pn.value; Store.scheduleSave(); } });
+
+    // toolbar
+    document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>this.setTool(b.dataset.tool));
+    document.querySelector('.tool[data-act="undo"]').onclick=()=>History.doUndo();
+    document.querySelector('.tool[data-act="redo"]').onclick=()=>History.doRedo();
+    document.querySelector('.tool[data-act="fit"]').onclick=()=>Canvas.fit();
+    document.querySelector('.tool[data-act="grid"]').onclick=()=>{ const pf=State.prefs(); pf.grid=!pf.grid; Canvas.apply(); this.updateToolbar(); Store.scheduleSave(); };
+    document.querySelector('.tool[data-act="snap"]').onclick=()=>{ const pf=State.prefs(); pf.snap=!pf.snap; this.updateToolbar(); Store.scheduleSave(); };
+
+    // align bar
+    document.querySelectorAll('#align-bar [data-align]').forEach(b=>b.onclick=()=>{
+      const a=b.dataset.align;
+      if(a==='group') Selection.group(); else if(a==='ungroup') Selection.ungroup(); else Selection.align(a);
+    });
+
+    // export menu
+    const eb=document.getElementById('btn-export'), em=document.getElementById('export-menu');
+    eb.onclick=(e)=>{ e.stopPropagation(); em.hidden=!em.hidden; };
+    em.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{ em.hidden=true; Exporter.run(b.dataset.export); });
+    document.addEventListener('click',(e)=>{ if(!e.target.closest('.menu-wrap')) em.hidden=true; });
+
+    // stage interactions
+    const stage=Canvas.stage;
+    stage.addEventListener('pointerdown',(e)=>this.onStageDown(e));
+    stage.addEventListener('dblclick',(e)=>{
+      if(this.screen!=='editor') return;
+      if(e.target.closest('.node')||e.target.closest('.section-title')) return;
+      const w=Canvas.screenToWorld(e.clientX,e.clientY); Nodes.createAt(w.x,w.y);
+    });
+  },
+
+  onStageDown(e){
+    if(this.screen!=='editor') return;
+    if(Nodes.editingId) Nodes.commitEdit();
+    if(this.spaceDown || e.button===1){ Canvas.startPan(e); return; }
+    if(e.button!==0) return;
+    if(this.tool==='node'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y); return; }
+    if(this.tool==='section'){ Sections.startDraw(e); return; }
+    Edges.deselect(); Selection.startMarquee(e);
+  }
+};
+</script>

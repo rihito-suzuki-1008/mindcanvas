@@ -1,0 +1,60 @@
+<script>
+const Shortcuts = {
+  init(){
+    document.addEventListener('keydown',(e)=>this.onKey(e));
+    document.addEventListener('keyup',(e)=>{ if(e.code==='Space') App.spaceDown=false; });
+    window.addEventListener('blur',()=>{ App.spaceDown=false; });
+  },
+  editing(){ const a=document.activeElement;
+    return !!Nodes.editingId || (a && (a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable)); },
+
+  onKey(e){
+    if(App.screen!=='editor') return;
+    const mod=e.ctrlKey||e.metaKey;
+    if(e.code==='Space' && !this.editing()){ App.spaceDown=true; if(e.target===document.body) e.preventDefault(); return; }
+    if(this.editing()) return; // editors manage their own keys
+
+    if(mod && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?History.doRedo():History.doUndo(); return; }
+    if(mod && e.key.toLowerCase()==='y'){ e.preventDefault(); History.doRedo(); return; }
+    if(mod && e.key.toLowerCase()==='a'){ e.preventDefault(); Selection.selectAll(); return; }
+    if(mod && e.key.toLowerCase()==='f'){ e.preventDefault(); Search.open(); return; }
+    if(mod && e.key.toLowerCase()==='g'){ e.preventDefault(); e.shiftKey?Selection.ungroup():Selection.group(); return; }
+    if(mod && e.key.toLowerCase()==='c'){ App.copy(); return; }
+    if(mod && e.key.toLowerCase()==='x'){ App.cut(); return; }
+    if(mod && e.key.toLowerCase()==='v'){ App.paste(); return; }
+    if(mod && (e.key==='='||e.key==='+')){ e.preventDefault(); Canvas.zoomStep(1); return; }
+    if(mod && e.key==='-'){ e.preventDefault(); Canvas.zoomStep(-1); return; }
+    if(mod && e.key==='0'){ e.preventDefault(); const r=Canvas.rect(); Canvas.zoomAt(r.left+r.width/2,r.top+r.height/2, 1/Canvas.vp().zoom); return; }
+
+    if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); Selection.deleteSelected(); return; }
+    if(e.key==='1' && e.shiftKey){ e.preventDefault(); Canvas.fit(); return; }
+
+    // tools
+    if(!mod && e.key.toLowerCase()==='v'){ App.setTool('select'); return; }
+    if(!mod && e.key.toLowerCase()==='n'){ App.setTool('node'); return; }
+    if(!mod && e.key.toLowerCase()==='s'){ App.setTool('section'); return; }
+
+    const ids=Selection.nodeIds();
+    const tree=State.project.mode==='tree';
+    if(e.key==='Tab' && tree && ids.length===1){ e.preventDefault(); Tree.addChild(ids[0]); return; }
+    if(e.key==='Enter' && ids.length===1){ e.preventDefault(); if(tree) Tree.addSibling(ids[0]); else Nodes.beginEdit(ids[0],'text'); return; }
+    if(e.key==='F2' && ids.length===1){ e.preventDefault(); Nodes.beginEdit(ids[0],'text'); return; }
+
+    if(e.key.indexOf('Arrow')===0 && ids.length){ e.preventDefault();
+      const step=e.shiftKey?1:State.GRID;
+      const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
+      const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
+      this.nudge(dx,dy); return; }
+
+    if(e.key==='Escape'){ Edges.deselect(); Selection.clear(); Selection.refresh(); App.closeMenus(); }
+  },
+
+  nudge(dx,dy){
+    let ids=Selection.nodeIds(); if(!ids.length) return;
+    if(State.project.mode==='tree'){ const set=new Set(ids); ids.forEach(id=>Tree.descendants(id).forEach(d=>set.add(d))); ids=[...set]; }
+    const snap=mcClone(State.project);
+    ids.forEach(id=>{ const n=State.getNode(id); n.x+=dx; n.y+=dy; });
+    History.pushSnapshot(snap); State.touchRender();
+  }
+};
+</script>

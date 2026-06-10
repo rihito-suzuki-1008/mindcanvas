@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>MindCanvas</title>
+  <?!= include('css_main'); ?>
+  <!-- CDN libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Home screen -->
+    <section id="home" class="screen">
+      <header class="home-head">
+        <div class="brand"><span class="brand-mark">◆</span> MindCanvas</div>
+        <button id="home-new" class="btn btn-primary">＋ 新規プロジェクト</button>
+      </header>
+      <div id="home-list" class="home-list"></div>
+      <div id="home-empty" class="home-empty" hidden>
+        まだプロジェクトがありません。「＋ 新規プロジェクト」から始めましょう。
+      </div>
+    </section>
+
+    <!-- Editor screen -->
+    <section id="editor" class="screen" hidden>
+      <header id="topbar">
+        <button id="btn-home" class="icon-btn" title="ホームへ">←</button>
+        <input id="project-name" class="project-name" />
+        <div id="sheet-tabs" class="sheet-tabs"></div>
+        <button id="sheet-add" class="icon-btn" title="シートを追加">＋</button>
+        <div class="spacer"></div>
+        <span id="sync-status" class="sync-status" title="保存状態">—</span>
+        <button id="btn-search" class="icon-btn" title="検索 (Ctrl+F)">🔍</button>
+        <div class="menu-wrap">
+          <button id="btn-export" class="btn">エクスポート ▾</button>
+          <div id="export-menu" class="menu" hidden>
+            <button data-export="png">PNG 画像</button>
+            <button data-export="pdf">PDF</button>
+            <button data-export="md">Markdown</button>
+            <button data-export="mermaid">Mermaid</button>
+          </div>
+        </div>
+      </header>
+
+      <div id="toolbar">
+        <button class="tool" data-tool="select" title="選択 (V)">▱</button>
+        <button class="tool" data-tool="node" title="ノード追加 (N)">▭</button>
+        <button class="tool" data-tool="section" title="セクション (S)">⬚</button>
+        <div class="tool-sep"></div>
+        <button class="tool" data-act="undo" title="元に戻す (Ctrl+Z)">↶</button>
+        <button class="tool" data-act="redo" title="やり直し (Ctrl+Shift+Z)">↷</button>
+        <div class="tool-sep"></div>
+        <button class="tool" data-act="grid" title="グリッド表示切替">#</button>
+        <button class="tool" data-act="snap" title="スナップ切替">⊞</button>
+        <button class="tool" data-act="fit" title="全体表示 (Shift+1)">⤢</button>
+      </div>
+
+      <div id="align-bar" class="align-bar" hidden>
+        <button data-align="left" title="左揃え">⇤</button>
+        <button data-align="hcenter" title="左右中央">⇔</button>
+        <button data-align="right" title="右揃え">⇥</button>
+        <button data-align="top" title="上揃え">⤒</button>
+        <button data-align="vcenter" title="上下中央">⇕</button>
+        <button data-align="bottom" title="下揃え">⤓</button>
+        <span class="align-sep"></span>
+        <button data-align="hdist" title="水平等間隔">⋯</button>
+        <button data-align="vdist" title="垂直等間隔">⋮</button>
+        <span class="align-sep"></span>
+        <button data-align="group" title="グループ化 (Ctrl+G)">▣</button>
+        <button data-align="ungroup" title="グループ解除 (Ctrl+Shift+G)">▢</button>
+      </div>
+
+      <div id="stage">
+        <div id="canvas-bg"></div>
+        <div id="world">
+          <div id="sections-layer"></div>
+          <svg id="edges-svg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#5b6472"></path>
+              </marker>
+            </defs>
+            <g id="branch-g"></g>
+            <g id="edges-g"></g>
+          </svg>
+          <div id="nodes-layer"></div>
+        </div>
+        <div id="overlay">
+          <div id="marquee" class="marquee" hidden></div>
+          <svg id="link-preview" class="link-preview" hidden>
+            <path d="" stroke="#3b82f6" stroke-width="2" fill="none" stroke-dasharray="6 4"></path>
+          </svg>
+        </div>
+        <div id="zoom-ctl" class="zoom-ctl">
+          <button data-zoom="out">−</button>
+          <span id="zoom-label">100%</span>
+          <button data-zoom="in">＋</button>
+        </div>
+        <canvas id="minimap" width="200" height="140"></canvas>
+        <div id="search-box" class="search-box" hidden>
+          <input id="search-input" placeholder="ボード全体を検索…" />
+          <span id="search-count" class="search-count"></span>
+          <button id="search-prev" title="前へ">↑</button>
+          <button id="search-next" title="次へ">↓</button>
+          <button id="search-close" title="閉じる">✕</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- New project modal -->
+    <div id="modal-root"></div>
+  </div>
+
+  <!-- JS modules (inlined via include) -->
+  <?!= include('js_state'); ?>
+  <?!= include('js_storage'); ?>
+  <?!= include('js_history'); ?>
+  <?!= include('js_canvas'); ?>
+  <?!= include('js_nodes'); ?>
+  <?!= include('js_edges'); ?>
+  <?!= include('js_tree'); ?>
+  <?!= include('js_sections'); ?>
+  <?!= include('js_selection'); ?>
+  <?!= include('js_minimap'); ?>
+  <?!= include('js_search'); ?>
+  <?!= include('js_export'); ?>
+  <?!= include('js_shortcuts'); ?>
+  <?!= include('js_home'); ?>
+  <?!= include('js_app'); ?>
+  <script> App.init(); </script>
+</body>
+</html>

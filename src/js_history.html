@@ -1,0 +1,41 @@
+<script>
+const History = {
+  undo:[], redo:[], LIMIT:100, _suspend:false,
+
+  reset(){ this.undo=[]; this.redo=[]; this.update(); },
+  push(){
+    if(this._suspend||!State.project) return;
+    this.pushSnapshot(mcClone(State.project));
+  },
+  /* push an externally-captured pre-mutation snapshot (used by drag/edit gestures) */
+  pushSnapshot(snap){
+    if(this._suspend||!snap) return;
+    this.undo.push(snap);
+    if(this.undo.length>this.LIMIT) this.undo.shift();
+    this.redo.length=0;
+    this.update();
+  },
+  doUndo(){
+    if(!this.undo.length) return;
+    this.redo.push(mcClone(State.project));
+    State.project=this.undo.pop();
+    this._restored(); this.update();
+  },
+  doRedo(){
+    if(!this.redo.length) return;
+    this.undo.push(mcClone(State.project));
+    State.project=this.redo.pop();
+    this._restored(); this.update();
+  },
+  _restored(){
+    // selection ids may now be invalid -> prune
+    if(typeof Selection!=='undefined') Selection.prune();
+    State.touch(); App.render(); Canvas.apply();
+  },
+  update(){
+    const u=document.querySelector('[data-act="undo"]'), r=document.querySelector('[data-act="redo"]');
+    if(u) u.style.opacity=this.undo.length?'1':'.35';
+    if(r) r.style.opacity=this.redo.length?'1':'.35';
+  }
+};
+</script>

@@ -1,0 +1,92 @@
+<script>
+const Canvas = {
+  stage:null, world:null, bg:null,
+  init(){
+    this.stage=document.getElementById('stage');
+    this.world=document.getElementById('world');
+    this.bg=document.getElementById('canvas-bg');
+    this._persist=debounce(()=>Store.scheduleSave(),600);
+    this.initEvents();
+  },
+  vp(){ const s=State.activeSheet(); return s?s.viewport:{x:0,y:0,zoom:1}; },
+  rect(){ return this.stage.getBoundingClientRect(); },
+
+  apply(){
+    if(!State.project) return;
+    const vp=this.vp();
+    this.world.style.transform='translate('+vp.x+'px,'+vp.y+'px) scale('+vp.zoom+')';
+    const pf=State.prefs();
+    this.bg.classList.toggle('grid', !!pf.grid);
+    const g=State.GRID*vp.zoom;
+    this.bg.style.backgroundSize=g+'px '+g+'px';
+    this.bg.style.backgroundPosition=vp.x+'px '+vp.y+'px';
+    const zl=document.getElementById('zoom-label'); if(zl) zl.textContent=Math.round(vp.zoom*100)+'%';
+    if(typeof Minimap!=='undefined') Minimap.draw();
+  },
+
+  /* coordinate transforms */
+  screenToWorld(cx,cy){ const r=this.rect(), vp=this.vp();
+    return { x:(cx-r.left-vp.x)/vp.zoom, y:(cy-r.top-vp.y)/vp.zoom }; },
+  worldToLocal(wx,wy){ const vp=this.vp(); return { x:wx*vp.zoom+vp.x, y:wy*vp.zoom+vp.y }; },
+
+  snap(v){ const pf=State.prefs(); return pf.snap?Math.round(v/State.GRID)*State.GRID:v; },
+
+  /* node/content bbox in world coords */
+  contentBBox(){
+    const s=State.activeSheet(); if(!s) return null;
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity,any=false;
+    for(const id in s.nodes){ const n=s.nodes[id]; if(n._hidden) continue; any=true;
+      const el=Nodes.els[id]; const w=el?el.offsetWidth:n.w, h=el?el.offsetHeight:(n.h||60);
+      minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+w); maxY=Math.max(maxY,n.y+h);
+    }
+    for(const id in s.sections){ const c=s.sections[id]; any=true;
+      minX=Math.min(minX,c.x); minY=Math.min(minY,c.y); maxX=Math.max(maxX,c.x+c.w); maxY=Math.max(maxY,c.y+c.h); }
+    if(!any) return null;
+    return { x:minX, y:minY, w:maxX-minX, h:maxY-minY };
+  },
+
+  fit(){
+    const vp=this.vp(), r=this.rect(), b=this.contentBBox();
+    if(!b){ vp.zoom=1; vp.x=r.width/2-80; vp.y=r.height/2-120; this.apply(); this._persist(); return; }
+    const pad=90;
+    const z=clamp(Math.min((r.width-pad*2)/b.w,(r.height-pad*2)/b.h),0.15,1.4);
+    vp.zoom=z; vp.x=(r.width-b.w*z)/2-b.x*z; vp.y=(r.height-b.h*z)/2-b.y*z;
+    this.apply(); this._persist();
+  },
+  centerOn(wx,wy,zoom){
+    const vp=this.vp(), r=this.rect(); if(zoom) vp.zoom=clamp(zoom,0.15,4);
+    vp.x=r.width/2-wx*vp.zoom; vp.y=r.height/2-wy*vp.zoom; this.apply(); this._persist();
+  },
+
+  panBy(dx,dy){ const vp=this.vp(); vp.x+=dx; vp.y+=dy; this.apply(); this._persist(); },
+  zoomAt(cx,cy,factor){
+    const vp=this.vp(), r=this.rect();
+    const lx=cx-r.left, ly=cy-r.top;
+    const wx=(lx-vp.x)/vp.zoom, wy=(ly-vp.y)/vp.zoom;
+    const z=clamp(vp.zoom*factor,0.15,4);
+    vp.zoom=z; vp.x=lx-wx*z; vp.y=ly-wy*z; this.apply(); this._persist();
+  },
+  zoomStep(dir){ const r=this.rect(); this.zoomAt(r.left+r.width/2, r.top+r.height/2, dir>0?1.2:1/1.2); },
+
+  startPan(e){
+    this.stage.classList.add('panning');
+    const sx=e.clientX, sy=e.clientY, vp=this.vp(), ox=vp.x, oy=vp.y;
+    const move=(ev)=>{ vp.x=ox+(ev.clientX-sx); vp.y=oy+(ev.clientY-sy); this.apply(); };
+    const up=()=>{ this.stage.classList.remove('panning');
+      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); this._persist(); };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  },
+
+  initEvents(){
+    this.stage.addEventListener('wheel',(e)=>{
+      e.preventDefault();
+      if(e.ctrlKey||e.metaKey){ this.zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0015)); }
+      else { this.panBy(-e.deltaX,-e.deltaY); }
+    },{passive:false});
+    document.querySelectorAll('.zoom-ctl [data-zoom]').forEach(b=>{
+      b.addEventListener('click',()=>this.zoomStep(b.dataset.zoom==='in'?1:-1));
+    });
+    window.addEventListener('resize',()=>{ if(State.project) this.apply(); });
+  }
+};
+</script>

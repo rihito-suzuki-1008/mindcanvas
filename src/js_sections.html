@@ -1,0 +1,92 @@
+<script>
+const Sections = {
+  layer:null, els:{},
+  init(){ this.layer=document.getElementById('sections-layer'); },
+
+  render(sheet){
+    const present={};
+    for(const id in sheet.sections){ present[id]=1; this.renderOne(sheet.sections[id]); }
+    for(const id in this.els){ if(!present[id]){ this.els[id].remove(); delete this.els[id]; } }
+  },
+  renderOne(sec){
+    let el=this.els[sec.id];
+    if(!el){
+      el=document.createElement('div'); el.className='section'; el.dataset.id=sec.id;
+      el.innerHTML='<div class="section-title"></div><div class="grip"></div>';
+      el.querySelector('.section-title').addEventListener('pointerdown',(e)=>this.startDrag(e,sec.id));
+      el.querySelector('.section-title').addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.editTitle(sec.id); });
+      el.querySelector('.grip').addEventListener('pointerdown',(e)=>this.startResize(e,sec.id));
+      this.layer.appendChild(el); this.els[sec.id]=el;
+    }
+    el.style.left=sec.x+'px'; el.style.top=sec.y+'px'; el.style.width=sec.w+'px'; el.style.height=sec.h+'px';
+    el.querySelector('.section-title').textContent=sec.title||'セクション';
+    el.classList.toggle('selected', Selection.hasSection(sec.id));
+  },
+
+  contained(sec){
+    const s=State.activeSheet(), out=[];
+    for(const id in s.nodes){ const n=s.nodes[id]; if(n._hidden) continue;
+      const el=Nodes.els[id]; const w=el?el.offsetWidth:n.w, h=el?el.offsetHeight:(n.h||60);
+      const cx=n.x+w/2, cy=n.y+h/2;
+      if(cx>=sec.x && cx<=sec.x+sec.w && cy>=sec.y && cy<=sec.y+sec.h) out.push(id);
+    } return out;
+  },
+
+  startDrag(e,id){
+    if(e.button!==0||App.spaceDown) return; e.stopPropagation();
+    const sec=State.activeSheet().sections[id];
+    if(e.shiftKey) Selection.toggleSection(id); else Selection.selectSection(id);
+    Edges.deselect(); Nodes.refreshSelection(); this.render(State.activeSheet()); App.updateAlignBar();
+    const start=Canvas.screenToWorld(e.clientX,e.clientY);
+    const s0={x:sec.x,y:sec.y};
+    const kids=this.contained(sec); const k0={}; kids.forEach(nid=>{ const n=State.getNode(nid); k0[nid]={x:n.x,y:n.y}; });
+    const snap=mcClone(State.project); let moved=false;
+    const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY); const dx=w.x-start.x, dy=w.y-start.y;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<2) return; moved=true;
+      sec.x=s0.x+dx; sec.y=s0.y+dy; kids.forEach(nid=>{ const n=State.getNode(nid); n.x=k0[nid].x+dx; n.y=k0[nid].y+dy; });
+      this.renderOne(sec); Nodes.applyPositions(); Edges.render(State.activeSheet()); };
+    const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      if(moved){ if(State.prefs().snap){ sec.x=Canvas.snap(sec.x); sec.y=Canvas.snap(sec.y);
+        kids.forEach(nid=>{ const n=State.getNode(nid); n.x=Canvas.snap(n.x); n.y=Canvas.snap(n.y); }); }
+        History.pushSnapshot(snap); State.touchRender(); } };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  },
+  startResize(e,id){
+    if(e.button!==0) return; e.stopPropagation();
+    const sec=State.activeSheet().sections[id];
+    const start=Canvas.screenToWorld(e.clientX,e.clientY); const w0=sec.w,h0=sec.h;
+    const snap=mcClone(State.project); let moved=false;
+    const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
+      sec.w=Math.max(120,w0+(w.x-start.x)); sec.h=Math.max(90,h0+(w.y-start.y)); moved=true; this.renderOne(sec); };
+    const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+      if(moved){ if(State.prefs().snap){ sec.w=Canvas.snap(sec.w); sec.h=Canvas.snap(sec.h); }
+        History.pushSnapshot(snap); State.touchRender(); } };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  },
+  editTitle(id){
+    const sec=State.activeSheet().sections[id]; if(!sec) return;
+    const v=window.prompt('セクション名', sec.title||''); if(v===null) return;
+    const snap=mcClone(State.project); sec.title=v; History.pushSnapshot(snap); State.touchRender();
+  },
+
+  /* draw a new section rectangle (section tool) */
+  startDraw(e){
+    const startW=Canvas.screenToWorld(e.clientX,e.clientY);
+    const r=Canvas.rect(); const mq=document.getElementById('marquee');
+    const sx=e.clientX-r.left, sy=e.clientY-r.top; mq.hidden=false;
+    const move=(ev)=>{ const x=Math.min(sx,ev.clientX-r.left), y=Math.min(sy,ev.clientY-r.top);
+      mq.style.left=x+'px'; mq.style.top=y+'px'; mq.style.width=Math.abs(ev.clientX-r.left-sx)+'px'; mq.style.height=Math.abs(ev.clientY-r.top-sy)+'px'; };
+    const up=(ev)=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); mq.hidden=true;
+      const endW=Canvas.screenToWorld(ev.clientX,ev.clientY);
+      const x=Math.min(startW.x,endW.x), y=Math.min(startW.y,endW.y), w=Math.abs(endW.x-startW.x), h=Math.abs(endW.y-startW.y);
+      App.setTool('select');
+      if(w<40||h<40) return;
+      const snap=mcClone(State.project);
+      const sec=State.addSection({ x:Canvas.snap(x), y:Canvas.snap(y), w:Canvas.snap(w), h:Canvas.snap(h) });
+      History.pushSnapshot(snap); State.touchRender();
+      Selection.selectSection(sec.id); this.render(State.activeSheet());
+    };
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  }
+};
+</script>

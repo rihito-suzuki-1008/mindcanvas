@@ -1,0 +1,55 @@
+# MindCanvas 仕様書
+
+> XMind（構造化マインドマップ）と FigJam（自由配置ホワイトボード）のいいとこ取りをした、ブレスト整理向け図解ツール。Google Apps Script (GAS) スタンドアロン Web アプリとして実装。
+
+| 項目 | 値 |
+|---|---|
+| プロダクト名 | MindCanvas |
+| バージョン | v2.0 |
+| 最終更新 | 2026-06-10 |
+| 形態 | GAS コンテナバインド Web アプリ（スプレッドシート連携・単一ページ） |
+| リポジトリ | `/Users/bot/Github/private/xmind` |
+| デプロイURL | `https://script.google.com/macros/s/AKfycbzneXk6NYzG6tAB8UrtBg0T7nEeEFLkupQarCQWf07FH_KLFer7_30QdyzvRBrs49o/exec` |
+
+---
+
+## ドキュメント構成
+
+| # | ファイル | 内容 |
+|---|---|---|
+| 1 | [requirements.md](requirements.md) | 機能要件 (FR) / 非機能要件 (NFR) / スコープ |
+| 2 | [architecture.md](architecture.md) | システム構成・配信モデル・レンダリング方式・モジュール構成 |
+| 3 | [data-model.md](data-model.md) | データモデル定義・ID 体系・永続化フォーマット |
+| 4 | [ui-and-shortcuts.md](ui-and-shortcuts.md) | 画面仕様・ツール・操作・キーボードショートカット一覧 |
+| 5 | [modules-api.md](modules-api.md) | 各 JS モジュールの責務と公開 API |
+| 6 | [storage-and-sync.md](storage-and-sync.md) | localStorage + Drive/スプレッドシート 自動フォールバック・競合解決・サーバ API |
+| 7 | [export.md](export.md) | PNG / PDF / Markdown / Mermaid エクスポート仕様 |
+| 8 | [development.md](development.md) | 開発環境・ビルド・ローカル検証・デプロイ・既知の制約 |
+
+---
+
+## 30秒概要
+
+- **2つのモード**：プロジェクト作成時に **ツリー型**（右展開ロジックツリー）か **フリーフォーム**（自由配置）を選ぶ。作成後の変更は不可。
+- **1プロジェクト = 複数シート**（タブ）。シートごとに独立したノード・エッジ・セクション・ビューポートを持つ。
+- **ノード**は角丸四角。テキストは **Markdown**（見出し・太字・箇条書き・コードブロック）対応 + メモ欄。
+- **接続**は 4 方向の矢印 + 遠距離カーブ。ノード境界をドラッグして作成。
+- **無限キャンバス**：ズーム・パン・グリッド・スナップ・ミニマップ。
+- **編集支援**：複数選択・整列/分配・グループ化・セクション・全体検索・Undo/Redo。
+- **保存**：localStorage に即時保存 + durable backend へ自動バックアップ。起動時に **Drive 優先・不可ならスプレッドシート**へ自動フォールバック（社内の Drive 封印環境対応）。
+- **エクスポート**：PNG / PDF / Markdown / Mermaid。
+
+---
+
+## 用語
+
+| 用語 | 定義 |
+|---|---|
+| プロジェクト (Project) | 1つの作業単位。複数シートを内包する最上位エンティティ。 |
+| シート (Sheet) | プロジェクト内のタブ。1枚のキャンバス。 |
+| ノード (Node) | キャンバス上の角丸四角の要素。Markdown テキストを持つ。 |
+| エッジ (Edge) | ノード間の接続線（矢印）。ユーザーが明示的に作成。 |
+| 枝 (Branch) | ツリーモードで `parentId` から自動描画される親子の接続線。エッジとは別管理。 |
+| セクション (Section) | キャンバス上の領域を囲う矩形。内包ノードと一緒に移動できる。 |
+| ビューポート (Viewport) | シートごとのスクロール位置とズーム率 `{x, y, zoom}`。 |
+| ワールド座標 / スクリーン座標 | ワールド=キャンバス論理座標、スクリーン=画面ピクセル座標。`Canvas` が相互変換。 |

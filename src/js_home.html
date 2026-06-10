@@ -1,0 +1,89 @@
+<script>
+const Home = {
+  init(){
+    document.getElementById('home-new').addEventListener('click',()=>this.newModal());
+  },
+  show(){
+    App.screen='home';
+    document.getElementById('editor').hidden=true;
+    document.getElementById('home').hidden=false;
+    this.render();
+    Store.refreshFromDrive(()=>this.render());
+  },
+  fmt(ts){ if(!ts) return ''; const d=new Date(ts); const p=(x)=>('0'+x).slice(-2);
+    return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); },
+
+  render(){
+    const list=Store.listLocal().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const wrap=document.getElementById('home-list'); const empty=document.getElementById('home-empty');
+    wrap.innerHTML=''; empty.hidden=list.length>0;
+    list.forEach(m=>{
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=
+        '<div class="card-thumb">'+(m.mode==='tree'?'🌳':'🗺️')+'</div>'+
+        '<div class="card-body">'+
+          '<div class="card-title">'+escAttr(m.name)+'</div>'+
+          '<div class="card-meta"><span>'+this.fmt(m.updatedAt)+'</span>'+
+            '<span class="card-mode">'+(m.mode==='tree'?'ツリー':'フリー')+'</span></div>'+
+          '<div class="card-actions">'+
+            '<button data-a="open">開く</button>'+
+            '<button data-a="dup">複製</button>'+
+            '<button data-a="del">削除</button>'+
+          '</div>'+
+        '</div>';
+      card.querySelector('[data-a="open"]').onclick=(e)=>{ e.stopPropagation(); App.openProject(m.id); };
+      card.querySelector('[data-a="dup"]').onclick=(e)=>{ e.stopPropagation(); this.duplicate(m.id); };
+      card.querySelector('[data-a="del"]').onclick=(e)=>{ e.stopPropagation(); this.remove(m.id, m.name); };
+      card.addEventListener('dblclick',()=>App.openProject(m.id));
+      wrap.appendChild(card);
+    });
+  },
+
+  duplicate(id){
+    Store.loadProject(id,(p)=>{ if(!p) return;
+      const copy=mcClone(p); copy.id=uid('pj'); copy.name=(p.name||'無題')+' のコピー';
+      copy.createdAt=Date.now(); copy.updatedAt=Date.now();
+      Store.saveAndBackup(copy); this.render(); App.toast('複製しました');
+    });
+  },
+  remove(id,name){
+    if(!confirm('「'+(name||'このプロジェクト')+'」を削除しますか？\nこの操作は元に戻せません。')) return;
+    Store.deleteProject(id); this.render(); App.toast('削除しました');
+  },
+
+  newModal(){
+    const root=document.getElementById('modal-root');
+    const mask=document.createElement('div'); mask.className='modal-mask';
+    mask.innerHTML=
+      '<div class="modal">'+
+        '<h2>新規プロジェクト</h2><p class="sub">作成後にモードは変更できません。</p>'+
+        '<label class="fld">プロジェクト名</label>'+
+        '<input class="txt" id="np-name" placeholder="無題のプロジェクト" />'+
+        '<label class="fld">モード</label>'+
+        '<div class="mode-grid">'+
+          '<div class="mode-opt sel" data-mode="tree"><div class="ic">🌳</div><div class="nm">ツリー型</div><div class="ds">中心から枝分かれ。Tab/Enterで高速入力</div></div>'+
+          '<div class="mode-opt" data-mode="freeform"><div class="ic">🗺️</div><div class="nm">フリーフォーム</div><div class="ds">自由配置のホワイトボード</div></div>'+
+        '</div>'+
+        '<div class="modal-actions"><button class="btn" data-x="cancel">キャンセル</button>'+
+        '<button class="btn btn-primary" data-x="create">作成</button></div>'+
+      '</div>';
+    let mode='tree';
+    mask.querySelectorAll('.mode-opt').forEach(o=>o.onclick=()=>{ mode=o.dataset.mode;
+      mask.querySelectorAll('.mode-opt').forEach(x=>x.classList.toggle('sel',x===o)); });
+    const close=()=>mask.remove();
+    mask.querySelector('[data-x="cancel"]').onclick=close;
+    mask.querySelector('[data-x="create"]').onclick=()=>{
+      const name=(mask.querySelector('#np-name').value||'').trim()||'無題のプロジェクト';
+      close(); this.create(name, mode);
+    };
+    mask.addEventListener('pointerdown',(e)=>{ if(e.target===mask) close(); });
+    root.appendChild(mask);
+    setTimeout(()=>mask.querySelector('#np-name').focus(),0);
+  },
+  create(name,mode){
+    const p=State.newProject(name,mode);
+    Store.saveAndBackup(p);
+    App.enterEditor(p);
+  }
+};
+</script>
