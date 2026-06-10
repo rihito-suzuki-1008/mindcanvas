@@ -152,6 +152,7 @@ const Nodes = {
       const s=State.activeSheet(), src=s.nodes[id]; if(!src) return false;
       const nn=mcClone(src); nn.id=uid('n'); nn.parentId=null; nn.groupId=null; delete nn._fresh; delete nn._hidden;
       s.nodes[nn.id]=nn; ids=[nn.id]; starts={}; starts[nn.id]={x:src.x,y:src.y};
+      State.addEdge(id, nn.id);
       Selection.clear(); Selection.nodes.add(nn.id); this.renderOne(nn); this.refreshSelection(); App.updateAlignBar();
       return true;
     };
@@ -160,7 +161,11 @@ const Nodes = {
       const dx=w.x-start.x, dy=w.y-start.y;
       if(!moved && Math.abs(dx)+Math.abs(dy)<2) return;
       if(!moved){ moved=true; if(duplicateDrag && !duplicateForDrag()) return; }
-      ids.forEach(nid=>{ const nn=State.getNode(nid); nn.x=starts[nid].x+dx; nn.y=starts[nid].y+dy; });
+      const pf=State.prefs();
+      ids.forEach(nid=>{ const nn=State.getNode(nid);
+        const nx=starts[nid].x+dx, ny=starts[nid].y+dy;
+        nn.x=pf.snap?Canvas.snap(nx):nx; nn.y=pf.snap?Canvas.snap(ny):ny;
+      });
       const sheet=State.activeSheet(); this.applyPositions(); if(tree) Edges.renderBranches(sheet); Edges.render(sheet); if(typeof Minimap!=='undefined') Minimap.draw();
     };
     const up=(ev)=>{

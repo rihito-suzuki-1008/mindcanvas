@@ -142,10 +142,6 @@ const App = {
     if(e.button!==0) return;
     if(this.tool==='node'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y); return; }
     if(this.tool==='section'){ Sections.startDraw(e); return; }
-    if(State.project.mode==='tree' && !(e.ctrlKey||e.metaKey)){
-      Canvas.startPan(e,()=>{ Selection.clear(); Selection.refresh(); Edges.deselect(); this.updateAlignBar(); });
-      return;
-    }
     Edges.deselect(); Selection.startMarquee(e);
   }
 };

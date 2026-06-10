@@ -59,7 +59,7 @@
 | `fit()` | 全体表示 |
 | `centerOn(wx,wy,zoom?)` | 指定ワールド点を中央へ |
 | `panBy(dx,dy)` / `zoomAt(cx,cy,factor)` / `zoomStep(dir)` | パン/ズーム（zoom clamp 0.15〜4） |
-| `startPan(e)` | パンジェスチャ |
+| `startPan(e,onClick)` | パンジェスチャ。`onClick` はドラッグ移動が発生しなかった場合のみ実行 |
 
 ## Nodes（js_nodes）— ノード描画/編集
 | メンバー | 説明 |
