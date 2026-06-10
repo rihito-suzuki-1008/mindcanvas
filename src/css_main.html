@@ -36,11 +36,17 @@ button{font-family:inherit; cursor:pointer}
 .home-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
   gap:16px; padding:26px; overflow:auto; height:calc(100% - 73px); align-content:start}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
-  box-shadow:var(--shadow); padding:0; overflow:hidden; cursor:pointer; transition:transform .08s}
+  box-shadow:var(--shadow); padding:0; overflow:hidden; cursor:pointer; transition:transform .08s, opacity .16s, border-color .16s, box-shadow .16s}
 .card:hover{transform:translateY(-2px)}
+.card.busy{opacity:.55; pointer-events:none}
+.card.loading{cursor:progress; pointer-events:none; border-color:rgba(59,130,246,.45);
+  box-shadow:0 0 0 3px rgba(59,130,246,.12), var(--shadow)}
 .card-thumb{height:120px; background:linear-gradient(135deg,#eef2f9,#e4e9f2);
   display:flex; align-items:center; justify-content:center; color:#9aa7bd; font-size:30px;
-  border-bottom:1px solid var(--line)}
+  border-bottom:1px solid var(--line); position:relative}
+.card-loading{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; background:rgba(255,255,255,.72); color:var(--accent); font-size:12px; font-weight:600;
+  backdrop-filter:blur(4px)}
 .card-body{padding:12px 14px}
 .card-title{font-weight:600; font-size:14px; margin:0 0 4px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis}
@@ -48,8 +54,13 @@ button{font-family:inherit; cursor:pointer}
 .card-mode{font-size:10px; padding:2px 6px; border-radius:99px; background:#eef2f9; color:#5566aa}
 .card-actions{display:flex; gap:6px; margin-top:10px}
 .card-actions button{font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid var(--line2);
-  background:#fff; color:var(--muted)}
+  background:#fff; color:var(--muted); display:inline-flex; align-items:center; gap:5px}
 .card-actions button:hover{background:#f3f4f6; color:var(--ink)}
+.card-actions button:disabled{cursor:progress; opacity:.75}
+.spin{width:20px; height:20px; border:2px solid rgba(59,130,246,.22); border-top-color:var(--accent);
+  border-radius:50%; display:inline-block; animation:mc-spin .8s linear infinite}
+.spin.small{width:12px; height:12px; border-width:1.5px}
+@keyframes mc-spin{to{transform:rotate(360deg)}}
 .home-empty{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
   color:var(--muted); font-size:14px}
 

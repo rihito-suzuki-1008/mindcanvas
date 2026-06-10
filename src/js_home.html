@@ -1,9 +1,11 @@
 <script>
 const Home = {
+  openingId:null,
   init(){
     document.getElementById('home-new').addEventListener('click',()=>this.newModal());
   },
   show(){
+    this.openingId=null;
     App.screen='home';
     document.getElementById('editor').hidden=true;
     document.getElementById('home').hidden=false;
@@ -18,28 +20,42 @@ const Home = {
     const wrap=document.getElementById('home-list'); const empty=document.getElementById('home-empty');
     wrap.innerHTML=''; empty.hidden=list.length>0;
     list.forEach(m=>{
-      const card=document.createElement('div'); card.className='card';
+      const busy=!!this.openingId, loading=this.openingId===m.id;
+      const card=document.createElement('div'); card.className='card'+(loading?' loading':(busy?' busy':''));
+      if(loading) card.setAttribute('aria-busy','true');
       card.innerHTML=
-        '<div class="card-thumb">'+(m.mode==='tree'?'🌳':'🗺️')+'</div>'+
+        '<div class="card-thumb">'+(m.mode==='tree'?'🌳':'🗺️')+
+          (loading?'<div class="card-loading"><span class="spin"></span><span>読み込み中</span></div>':'')+
+        '</div>'+
         '<div class="card-body">'+
           '<div class="card-title">'+escAttr(m.name)+'</div>'+
           '<div class="card-meta"><span>'+this.fmt(m.updatedAt)+'</span>'+
             '<span class="card-mode">'+(m.mode==='tree'?'ツリー':'フリー')+'</span></div>'+
           '<div class="card-actions">'+
-            '<button data-a="open">開く</button>'+
-            '<button data-a="dup">複製</button>'+
-            '<button data-a="del">削除</button>'+
+            '<button data-a="open" '+(busy?'disabled':'')+'>'+(loading?'<span class="spin small"></span>開いています':'開く')+'</button>'+
+            '<button data-a="dup" '+(busy?'disabled':'')+'>複製</button>'+
+            '<button data-a="del" '+(busy?'disabled':'')+'>削除</button>'+
           '</div>'+
         '</div>';
-      card.querySelector('[data-a="open"]').onclick=(e)=>{ e.stopPropagation(); App.openProject(m.id); };
+      card.querySelector('[data-a="open"]').onclick=(e)=>{ e.stopPropagation(); this.open(m.id); };
       card.querySelector('[data-a="dup"]').onclick=(e)=>{ e.stopPropagation(); this.duplicate(m.id); };
       card.querySelector('[data-a="del"]').onclick=(e)=>{ e.stopPropagation(); this.remove(m.id, m.name); };
-      card.addEventListener('dblclick',()=>App.openProject(m.id));
+      card.addEventListener('dblclick',()=>this.open(m.id));
       wrap.appendChild(card);
     });
   },
 
+  open(id){
+    if(this.openingId) return;
+    this.openingId=id; this.render();
+    Store.loadProject(id,(p)=>{
+      this.openingId=null;
+      if(p) App.enterEditor(p);
+      else { this.render(); App.toast('プロジェクトを開けませんでした'); }
+    });
+  },
   duplicate(id){
+    if(this.openingId) return;
     Store.loadProject(id,(p)=>{ if(!p) return;
       const copy=mcClone(p); copy.id=uid('pj'); copy.name=(p.name||'無題')+' のコピー';
       copy.createdAt=Date.now(); copy.updatedAt=Date.now();
@@ -47,6 +63,7 @@ const Home = {
     });
   },
   remove(id,name){
+    if(this.openingId) return;
     if(!confirm('「'+(name||'このプロジェクト')+'」を削除しますか？\nこの操作は元に戻せません。')) return;
     Store.deleteProject(id); this.render(); App.toast('削除しました');
   },
