@@ -8,8 +8,6 @@
 | バージョン | v2.0 |
 | 最終更新 | 2026-06-10 |
 | 形態 | GAS コンテナバインド Web アプリ（スプレッドシート連携・単一ページ） |
-| リポジトリ | `/Users/bot/Github/private/xmind` |
-| デプロイURL | `https://script.google.com/macros/s/AKfycbzneXk6NYzG6tAB8UrtBg0T7nEeEFLkupQarCQWf07FH_KLFer7_30QdyzvRBrs49o/exec` |
 
 ---
 
