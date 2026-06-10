@@ -11,6 +11,7 @@
 | `GRID, NODE_W, H_GAP, V_GAP` | 定数 |
 | `activeSheet()` | アクティブシートを返す |
 | `prefs()` | `project.prefs`（grid/snap） |
+| `nodeDefaults(mode)` | モード別の新規ノード初期サイズ（ツリー型は横長、フリーフォームは正方形寄り） |
 | `mkNode(props)` / `blankSheet(id,name,mode)` / `newProject(name,mode)` | 生成 |
 | `addSheet(name)` / `removeSheet(id)` / `renameSheet(id,name)` / `setActiveSheet(id)` | シート操作（commit 経由） |
 | `addNode(props)` / `getNode(id)` / `removeNodes(ids)` | ノード（removeNodes はツリー子孫と関連エッジも除去） |

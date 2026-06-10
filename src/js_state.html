@@ -9,17 +9,21 @@ function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/
 /* ===== state ===== */
 const State = {
   project:null,
-  GRID:20, NODE_W:200, H_GAP:64, V_GAP:18,
+  GRID:20, NODE_W:200, FREE_NODE_W:170, FREE_NODE_H:150, H_GAP:64, V_GAP:18,
 
   activeSheet(){
     const p=this.project; if(!p) return null;
     return p.sheets.find(s=>s.id===p.activeSheetId) || p.sheets[0];
   },
   prefs(){ return this.project ? (this.project.prefs || (this.project.prefs={grid:true,snap:true})) : {grid:true,snap:true}; },
+  nodeDefaults(mode){
+    return mode==='freeform' ? { w:this.FREE_NODE_W, h:this.FREE_NODE_H } : { w:this.NODE_W, h:0 };
+  },
 
   mkNode(props){
+    const d=this.nodeDefaults(this.project&&this.project.mode);
     return Object.assign({
-      id:uid('n'), x:0, y:0, w:this.NODE_W, h:0,
+      id:uid('n'), x:0, y:0, w:d.w, h:d.h,
       text:'アイデア', memo:'', parentId:null, collapsed:false, groupId:null
     }, props||{});
   },

@@ -49,7 +49,7 @@ const Nodes = {
       const memo=el.querySelector('.node-memo');
       if(n.memo){ memo.hidden=false; memo.textContent=n.memo; } else memo.hidden=true;
     }
-    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px';
+    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
     el.classList.toggle('selected', Selection.hasNode(n.id));
     // tree collapse toggle
     const tg=el.querySelector('.collapse-toggle');
@@ -64,7 +64,7 @@ const Nodes = {
   applyPositions(){
     const s=State.activeSheet(); if(!s) return;
     for(const id in this.els){ const n=s.nodes[id]; if(!n) continue;
-      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; }
+      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; this.els[id].style.minHeight=(n.h||0)+'px'; }
   },
   refreshSelection(){ for(const id in this.els){ this.els[id].classList.toggle('selected', Selection.hasNode(id)); } },
 
@@ -82,7 +82,7 @@ const Nodes = {
     if(this._which==='memo'){ el.querySelector('.node-memo').hidden=true; el.appendChild(ta); }
     else { el.querySelector('.node-md').style.display='none'; el.insertBefore(ta, el.firstChild); }
     const fit=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
-    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ Tree.relayout(); this.applyPositions(); Edges.render(State.activeSheet()); } });
+    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ const sheet=State.activeSheet(); Tree.relayout(); this.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); } });
     ta.addEventListener('keydown',(ev)=>this.onEditKey(ev,id));
     ta.addEventListener('blur',()=>this.commitEdit());
     this._editor=ta;
@@ -120,7 +120,9 @@ const Nodes = {
   /* ---------- create ---------- */
   createAt(wx,wy,opts){
     const snap=mcClone(State.project);
-    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-State.NODE_W/2), y:Canvas.snap(wy-20), text:'' }, opts||{}));
+    const o=opts||{}, d=State.nodeDefaults(State.project.mode);
+    const w=o.w||d.w, h=o.h!=null?o.h:d.h;
+    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-w/2), y:Canvas.snap(wy-(h?h/2:20)), w:w, h:h, text:'' }, o));
     n._fresh=true;
     History.pushSnapshot(snap); State.touchRender();
     Selection.selectNode(n.id); this.refreshSelection();
@@ -140,17 +142,26 @@ const Nodes = {
     if(!Selection.hasNode(id)) return;
 
     const tree=State.project.mode==='tree';
+    const duplicateDrag=!tree && e.altKey;
     const start=Canvas.screenToWorld(e.clientX,e.clientY);
     let ids=Selection.nodeIds();
     if(tree){ const set=new Set(ids); ids.forEach(nid=>Tree.descendants(nid).forEach(d=>set.add(d))); ids=[...set]; }
-    const starts={}; ids.forEach(nid=>{ const nn=State.getNode(nid); starts[nid]={x:nn.x,y:nn.y}; });
+    let starts={}; ids.forEach(nid=>{ const nn=State.getNode(nid); starts[nid]={x:nn.x,y:nn.y}; });
     const snap=mcClone(State.project); let moved=false;
+    const duplicateForDrag=()=>{
+      const s=State.activeSheet(), src=s.nodes[id]; if(!src) return false;
+      const nn=mcClone(src); nn.id=uid('n'); nn.parentId=null; nn.groupId=null; delete nn._fresh; delete nn._hidden;
+      s.nodes[nn.id]=nn; ids=[nn.id]; starts={}; starts[nn.id]={x:src.x,y:src.y};
+      Selection.clear(); Selection.nodes.add(nn.id); this.renderOne(nn); this.refreshSelection(); App.updateAlignBar();
+      return true;
+    };
     const move=(ev)=>{
       const w=Canvas.screenToWorld(ev.clientX,ev.clientY);
       const dx=w.x-start.x, dy=w.y-start.y;
-      if(!moved && Math.abs(dx)+Math.abs(dy)<2) return; moved=true;
+      if(!moved && Math.abs(dx)+Math.abs(dy)<2) return;
+      if(!moved){ moved=true; if(duplicateDrag && !duplicateForDrag()) return; }
       ids.forEach(nid=>{ const nn=State.getNode(nid); nn.x=starts[nid].x+dx; nn.y=starts[nid].y+dy; });
-      this.applyPositions(); Edges.render(State.activeSheet()); if(typeof Minimap!=='undefined') Minimap.draw();
+      const sheet=State.activeSheet(); this.applyPositions(); if(tree) Edges.renderBranches(sheet); Edges.render(sheet); if(typeof Minimap!=='undefined') Minimap.draw();
     };
     const up=(ev)=>{
       window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
@@ -169,7 +180,7 @@ const Nodes = {
     const snap=mcClone(State.project); let moved=false;
     const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY); n.w=Math.max(120,w0+(w.x-start.x)); moved=true;
       if(State.project.mode==='tree'){ Tree.relayout(); }
-      this.applyPositions(); Edges.render(State.activeSheet()); };
+      const sheet=State.activeSheet(); this.applyPositions(); if(State.project.mode==='tree') Edges.renderBranches(sheet); Edges.render(sheet); };
     const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
       if(moved){ if(State.prefs().snap) n.w=Math.max(120,Canvas.snap(n.w)); History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
