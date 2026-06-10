@@ -114,9 +114,15 @@
 
 ## 1.3 非機能要件 (NFR)
 
+<!-- 2026-06-10 / #5 #6 #7 #8: UI質感、SVGアイコン、ツールバーtooltipを要件化。 -->
+
 | ID | 要件 |
 |---|---|
 | NFR-1 操作性 | ドラッグ&ドロップ中心、主要操作にキーボードショートカット。 |
+| NFR-1a 操作性 | ボタンhoverは白化ではなく、軽い浮き・拡大・影でフィードバックする。 |
+| NFR-1b 視覚設計 | UIはApple/Notion風の柔らかい質感を基調とし、過度にゲーム風へ寄せない。 |
+| NFR-1c 視覚設計 | 主要なUIアイコンは絵文字・文字記号ではなくSVGで表現する。 |
+| NFR-1d 操作支援 | 左ツールバーのアイコンボタンはhover / focusでヒントを表示する。 |
 | NFR-2 応答性 | localStorage 即時保存で体感ラグなし。Drive 同期はバックグラウンド（デバウンス）。 |
 | NFR-3 堅牢性 | GAS サンドボックス iframe の origin 変動による localStorage 消失に備え Drive を durable store とする。 |
 | NFR-4 セキュリティ | Markdown は `DOMPurify` でサニタイズ。Drive スコープは `drive.file`（アプリ作成ファイルのみ）。 |

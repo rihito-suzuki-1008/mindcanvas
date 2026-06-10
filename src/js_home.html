@@ -24,7 +24,7 @@ const Home = {
       const card=document.createElement('div'); card.className='card'+(loading?' loading':(busy?' busy':''));
       if(loading) card.setAttribute('aria-busy','true');
       card.innerHTML=
-        '<div class="card-thumb">'+(m.mode==='tree'?'🌳':'🗺️')+
+        '<div class="card-thumb">'+iconSvg(m.mode==='tree'?'tree':'freeform','thumb-icon')+
           (loading?'<div class="card-loading"><span class="spin"></span><span>読み込み中</span></div>':'')+
         '</div>'+
         '<div class="card-body">'+
@@ -78,8 +78,8 @@ const Home = {
         '<input class="txt" id="np-name" placeholder="無題のプロジェクト" />'+
         '<label class="fld">モード</label>'+
         '<div class="mode-grid">'+
-          '<div class="mode-opt sel" data-mode="tree"><div class="ic">🌳</div><div class="nm">ツリー型</div><div class="ds">中心から枝分かれ。Tab/Enterで高速入力</div></div>'+
-          '<div class="mode-opt" data-mode="freeform"><div class="ic">🗺️</div><div class="nm">フリーフォーム</div><div class="ds">自由配置のホワイトボード</div></div>'+
+          '<div class="mode-opt sel" data-mode="tree"><div class="ic">'+iconSvg('tree')+'</div><div class="nm">ツリー型</div><div class="ds">中心から枝分かれ。Tab/Enterで高速入力</div></div>'+
+          '<div class="mode-opt" data-mode="freeform"><div class="ic">'+iconSvg('freeform')+'</div><div class="nm">フリーフォーム</div><div class="ds">自由配置のホワイトボード</div></div>'+
         '</div>'+
         '<div class="modal-actions"><button class="btn" data-x="cancel">キャンセル</button>'+
         '<button class="btn btn-primary" data-x="create">作成</button></div>'+

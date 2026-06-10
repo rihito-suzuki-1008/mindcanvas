@@ -5,6 +5,7 @@ function mcClone(o){ return JSON.parse(JSON.stringify(o)); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function debounce(fn,ms){ let t; return function(){ const a=arguments,c=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(c,a); },ms); }; }
 function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function iconSvg(name, cls){ return '<svg class="i '+(cls||'')+'" aria-hidden="true"><use href="#i-'+name+'"></use></svg>'; }
 
 /* ===== state ===== */
 const State = {
