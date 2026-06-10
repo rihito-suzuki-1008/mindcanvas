@@ -1,78 +1,77 @@
 # MindCanvas
 
-MindCanvas is a Google Apps Script web app for organizing ideas on an infinite canvas.
-It combines two ways of thinking in one personal workspace:
+MindCanvas は、アイデアを無限キャンバス上で整理するための Google Apps Script 製 Web アプリです。
 
-- **Tree mode** for structured, right-expanding mind maps
-- **Freeform mode** for loose brainstorming, diagrams, and visual notes
+XMind のような構造化マインドマップと、FigJam のような自由配置ホワイトボードの中間を目指しています。
 
-Projects are saved immediately to `localStorage` and can be backed up through Google
-Drive or a bound Google Spreadsheet, depending on the deployment environment.
+- **ツリー型**: 右方向に展開するロジックツリーとして整理する
+- **フリーフォーム**: アイデア、図解、メモを自由に配置する
 
-## Features
+プロジェクトは `localStorage` に即時保存され、環境に応じて Google Drive またはコンテナバインドされた Google スプレッドシートへバックアップできます。
 
-- Multiple projects and sheets
-- Tree and freeform canvas modes
-- Markdown-enabled nodes with memo fields
-- Drag-to-connect edges with labels
-- Zoom, pan, grid, snap, minimap, and fit-to-view
-- Selection, alignment, distribution, grouping, sections, undo/redo
-- Cross-sheet search
-- Export to PNG, PDF, Markdown, and Mermaid
-- Durable storage fallback: Drive first, bound Spreadsheet when Drive is unavailable
+## 主な機能
 
-## Tech Stack
+- 複数プロジェクト / 複数シート
+- ツリー型 / フリーフォームのキャンバスモード
+- Markdown 対応ノードとメモ欄
+- ノード間の接続線、矢印、ラベル
+- ズーム、パン、グリッド、スナップ、ミニマップ、全体表示
+- 複数選択、整列、分配、グループ化、セクション、Undo / Redo
+- 全シート横断検索
+- PNG / PDF / Markdown / Mermaid エクスポート
+- Drive 優先、利用できない場合はスプレッドシートへ倒す保存バックエンド
+
+## 技術構成
 
 - Google Apps Script
-- Vanilla HTML/CSS/JavaScript
-- SVG for edges and branches
-- DOM-based nodes for rich text editing
-- `marked`, `DOMPurify`, `html-to-image`, and `jsPDF` from CDN
+- Vanilla HTML / CSS / JavaScript
+- SVG によるエッジ・枝線描画
+- DOM ノードによるリッチテキスト表示・編集
+- CDN 経由の `marked`, `DOMPurify`, `html-to-image`, `jsPDF`
 
-## Repository Structure
+## ディレクトリ構成
 
 ```text
-src/                 GAS source files pushed by clasp
-docs/                Product, architecture, data model, and development docs
-build_local.js       Local preview builder for browser testing
+src/                 clasp で push する GAS ソース
+docs/                要件、設計、データモデル、開発手順などのドキュメント
+build_local.js       ローカルプレビュー用ビルドスクリプト
 ```
 
-Apps Script serves a single HTML file, so `src/index.html` includes the CSS and JS
-partials from `src/` with GAS scriptlets.
+Google Apps Script は単一 HTML として配信するため、`src/index.html` から `src/` 配下の CSS / JS partial を GAS scriptlet で読み込む構成です。
 
-## Local Preview
+## ローカルプレビュー
 
-Build the standalone preview file:
+GAS にデプロイせず、ブラウザで動作確認できます。
 
 ```bash
 node build_local.js
 ```
 
-Then serve the repository root and open `local_preview.html`:
+その後、リポジトリルートで静的サーバを起動します。
 
 ```bash
 python3 -m http.server 8765
 ```
 
+ブラウザで次を開きます。
+
 ```text
 http://localhost:8765/local_preview.html
 ```
 
-Add `?backend=sheet` to the URL to test the Spreadsheet fallback path in the local
-stubbed environment.
+URL に `?backend=sheet` を付けると、ローカルスタブ環境でスプレッドシート保存経路を検証できます。
 
-## Deploying to Google Apps Script
+## Google Apps Script へのデプロイ
 
-This repository intentionally does not include `.clasp.json`. Create your own Apps
-Script project and keep the generated script ID local.
+このリポジトリには `.clasp.json` を含めていません。各自で Apps Script プロジェクトを作成し、生成された `scriptId` はローカルにだけ保持してください。
 
-For a spreadsheet-bound deployment:
+スプレッドシートにバインドしたプロジェクトを作る例:
 
 ```bash
 clasp create --type sheets --title "MindCanvas"
 ```
 
-Create `.clasp.json` in the repository root:
+リポジトリルートに `.clasp.json` を作成します。
 
 ```json
 {
@@ -81,40 +80,38 @@ Create `.clasp.json` in the repository root:
 }
 ```
 
-Then push and deploy:
+push / deploy します。
 
 ```bash
 clasp push -f
 clasp deploy --description "MindCanvas"
 ```
 
-See [docs/development.md](docs/development.md) for more detailed setup notes.
+詳しい手順は [docs/development.md](docs/development.md) を参照してください。
 
-## Google OAuth Scopes
+## Google OAuth スコープ
 
-The default manifest requests:
+標準のマニフェストでは、次のスコープを要求します。
 
 - `https://www.googleapis.com/auth/drive.file`
 - `https://www.googleapis.com/auth/spreadsheets.currentonly`
 
-`drive.file` lets the app create and manage only files it creates in Drive.
-`spreadsheets.currentonly` is used for the spreadsheet-bound fallback store.
+`drive.file` は、このアプリが作成した Drive ファイルのみを作成・管理するために使います。
+`spreadsheets.currentonly` は、スプレッドシートにバインドした保存バックエンドで使います。
 
-If Drive access is not available in your environment, remove the `drive.file` scope
-from `src/appsscript.json`; MindCanvas will fall back to the bound Spreadsheet path
-when deployed that way.
+Drive を利用できない環境では、`src/appsscript.json` から `drive.file` スコープを削除してください。その場合、スプレッドシートにバインドしてデプロイすると、MindCanvas はスプレッドシート保存経路へフォールバックします。
 
-## Documentation
+## ドキュメント
 
-- [Requirements](docs/requirements.md)
-- [Architecture](docs/architecture.md)
-- [Data model](docs/data-model.md)
-- [UI and shortcuts](docs/ui-and-shortcuts.md)
-- [Module API](docs/modules-api.md)
-- [Storage and sync](docs/storage-and-sync.md)
-- [Export](docs/export.md)
-- [Development](docs/development.md)
+- [要件定義](docs/requirements.md)
+- [アーキテクチャ](docs/architecture.md)
+- [データモデル](docs/data-model.md)
+- [UI・操作・ショートカット](docs/ui-and-shortcuts.md)
+- [モジュール API](docs/modules-api.md)
+- [保存・同期](docs/storage-and-sync.md)
+- [エクスポート](docs/export.md)
+- [開発・ビルド・デプロイ](docs/development.md)
 
-## License
+## ライセンス
 
 MIT
