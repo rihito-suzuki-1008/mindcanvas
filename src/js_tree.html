@@ -1,23 +1,26 @@
 <script>
 const Tree = {
-  isTree(){ return State.project && State.project.mode==='tree'; },
+  isTreeNode(n){ return !!n && n.kind==='tree'; },
   W(n){ const el=Nodes.els[n.id]; return el?el.offsetWidth:n.w; },
   H(n){ const el=Nodes.els[n.id]; return el?el.offsetHeight:(n.h||60); },
 
+  // tree roots = tree-kind nodes whose parent is missing or non-tree
   roots(){ const s=State.activeSheet(), out=[]; for(const id in s.nodes){ const n=s.nodes[id];
-    if(!n.parentId || !s.nodes[n.parentId]) out.push(n); } return out; },
-  childrenOf(id){ const s=State.activeSheet(), out=[]; for(const k in s.nodes){ if(s.nodes[k].parentId===id) out.push(s.nodes[k]); }
+    if(!this.isTreeNode(n)) continue;
+    if(!n.parentId || !this.isTreeNode(s.nodes[n.parentId])) out.push(n); } return out; },
+  childrenOf(id){ const s=State.activeSheet(), out=[]; if(!this.isTreeNode(s.nodes[id])) return out;
+    for(const k in s.nodes){ const c=s.nodes[k]; if(this.isTreeNode(c) && c.parentId===id) out.push(c); }
     out.sort((a,b)=>a.y-b.y); return out; },
   descendants(id){ const out=[]; const walk=(pid)=>{ this.childrenOf(pid).forEach(c=>{ out.push(c.id); walk(c.id); }); }; walk(id); return out; },
 
   computeVisibility(){
     const s=State.activeSheet(); for(const id in s.nodes) s.nodes[id]._hidden=false;
     const hide=(pid)=>{ this.childrenOf(pid).forEach(c=>{ c._hidden=true; hide(c.id); }); };
-    for(const id in s.nodes){ if(s.nodes[id].collapsed) hide(id); }
+    for(const id in s.nodes){ if(this.isTreeNode(s.nodes[id]) && s.nodes[id].collapsed) hide(id); }
   },
 
   relayout(){
-    if(!this.isTree()) return;
+    if(!State.project) return;
     const roots=this.roots();
     roots.forEach(root=>{
       const pos={};
@@ -42,7 +45,7 @@ const Tree = {
     const snap=mcClone(State.project);
     const sibs=this.childrenOf(parentId);
     const y = sibs.length ? (sibs[sibs.length-1].y + this.H(sibs[sibs.length-1]) + State.V_GAP) : parent.y;
-    const n=State.addNode({ parentId:parentId, x:parent.x+this.W(parent)+State.H_GAP, y:y, text:'' });
+    const n=State.addNode({ parentId:parentId, x:parent.x+this.W(parent)+State.H_GAP, y:y, text:'', kind:'tree' });
     n._fresh=true; if(parent.collapsed) parent.collapsed=false;
     History.pushSnapshot(snap); State.touchRender();
     Selection.selectNode(n.id); Nodes.refreshSelection(); Nodes.beginEdit(n.id,'text');
@@ -51,7 +54,7 @@ const Tree = {
     const ref=State.getNode(refId); if(!ref) return;
     if(!ref.parentId || !State.getNode(ref.parentId)){ this.addChild(refId); return; }
     const snap=mcClone(State.project);
-    const n=State.addNode({ parentId:ref.parentId, x:ref.x, y:ref.y+this.H(ref)+State.V_GAP-0.5, text:'' });
+    const n=State.addNode({ parentId:ref.parentId, x:ref.x, y:ref.y+this.H(ref)+State.V_GAP-0.5, text:'', kind:'tree' });
     n._fresh=true;
     History.pushSnapshot(snap); State.touchRender();
     Selection.selectNode(n.id); Nodes.refreshSelection(); Nodes.beginEdit(n.id,'text');
@@ -67,8 +70,8 @@ const Tree = {
     const banned=new Set([id, ...this.descendants(id)]);
     const elt=document.elementFromPoint(ev.clientX, ev.clientY);
     const tgtEl=elt&&elt.closest?elt.closest('.node'):null;
-    if(tgtEl){ const tid=tgtEl.dataset.id;
-      if(!banned.has(tid) && tid!==node.parentId){ node.parentId=tid; const t=State.getNode(tid); if(t&&t.collapsed) t.collapsed=false; }
+    if(tgtEl){ const tid=tgtEl.dataset.id; const tgt=State.getNode(tid);
+      if(this.isTreeNode(tgt) && !banned.has(tid) && tid!==node.parentId){ node.parentId=tid; if(tgt.collapsed) tgt.collapsed=false; }
       else if(node.parentId && tid!==node.parentId){ node.parentId=null; }
     } else if(node.parentId){
       node.parentId=null;

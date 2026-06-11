@@ -1,6 +1,6 @@
 <script>
 const App = {
-  screen:'home', tool:'select', spaceDown:false, clipboard:null, clipboardText:'',
+  screen:'home', tool:'select', penKind:'tree', spaceDown:false, clipboard:null, clipboardText:'',
 
   init(){
     Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Shortcuts.init(); Home.init();
@@ -11,7 +11,8 @@ const App = {
   /* ---------- routing ---------- */
   enterEditor(p){
     Nodes.commitEdit();
-    State.project=p; History.reset(); Selection.clear(); Edges.selectedId=null;
+    State.project=p; this.migrateProject(p); History.reset(); Selection.clear(); Edges.selectedId=null;
+    this.penKind = (p.penKind==='free') ? 'free' : 'tree';
     this.screen='editor';
     document.getElementById('home').hidden=true;
     document.getElementById('editor').hidden=false;
@@ -21,6 +22,18 @@ const App = {
     Canvas.fit();
     Store.setStatus(Store.backend==='local'?'local':'synced');
   },
+  // backfill node.kind / project.penKind for projects created before node-level mode
+  migrateProject(p){
+    if(!p||!p.sheets) return;
+    const defKind = (p.mode==='freeform') ? 'free' : 'tree';
+    p.sheets.forEach(sh=>{ if(sh&&sh.nodes){ for(const id in sh.nodes){ const n=sh.nodes[id]; if(!n.kind) n.kind=defKind; } } });
+    if(p.penKind!=='free' && p.penKind!=='tree') p.penKind=defKind;
+  },
+  setPenKind(kind){
+    this.penKind = (kind==='free') ? 'free' : 'tree';
+    if(State.project){ State.project.penKind=this.penKind; Store.scheduleSave(); }
+    this.updateToolbar();
+  },
   openProject(id){ Store.loadProject(id,(p)=>{ if(p) this.enterEditor(p); else this.toast('プロジェクトを開けませんでした'); }); },
   showHome(){ Nodes.commitEdit(); this.closeMenus(); Home.show(); },
 
@@ -28,9 +41,9 @@ const App = {
   render(){
     if(!State.project) return;
     const sheet=State.activeSheet(); if(!sheet) return;
-    if(State.project.mode==='tree'){ Tree.computeVisibility(); Nodes.render(sheet); Tree.relayout(); Nodes.applyPositions(); }
-    else { Nodes.render(sheet); }
-    if(State.project.mode==='tree') Edges.renderBranches(sheet); else Edges.clearBranches();
+    // tree-kind nodes are auto-laid-out; free-kind nodes stay where they are (both coexist on one sheet)
+    Tree.computeVisibility(); Nodes.render(sheet); Tree.relayout(); Nodes.applyPositions();
+    Edges.renderBranches(sheet);
     Edges.render(sheet); Sections.render(sheet);
     Canvas.apply();
     this.updateSheetTabs(); this.updateAlignBar(); History.update();
@@ -44,6 +57,7 @@ const App = {
   },
   updateToolbar(){
     document.querySelectorAll('.tool[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===this.tool));
+    document.querySelectorAll('.tool[data-pen]').forEach(b=>b.classList.toggle('active', b.dataset.pen===this.penKind));
     const pf=State.prefs();
     const g=document.querySelector('.tool[data-act="grid"]'), s=document.querySelector('.tool[data-act="snap"]');
     if(g) g.classList.toggle('active', !!pf.grid);
@@ -97,9 +111,10 @@ const App = {
     this.toast('貼り付けました');
   },
   treePasteTarget(){
-    if(!State.project || State.project.mode!=='tree') return null;
+    if(!State.project) return null;
     const ids=Selection.nodeIds();
-    return ids.length===1 ? ids[0] : null;
+    if(ids.length!==1) return null;
+    return Tree.isTreeNode(State.getNode(ids[0])) ? ids[0] : null;
   },
   async readClipboardText(){
     if(!navigator.clipboard || !navigator.clipboard.readText) return '';
@@ -162,6 +177,7 @@ const App = {
     pn.addEventListener('input',()=>{ if(State.project){ State.project.name=pn.value; Store.scheduleSave(); } });
 
     // toolbar
+    document.querySelectorAll('.tool[data-pen]').forEach(b=>b.onclick=()=>this.setPenKind(b.dataset.pen));
     document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>this.setTool(b.dataset.tool));
     document.querySelector('.tool[data-act="undo"]').onclick=()=>History.doUndo();
     document.querySelector('.tool[data-act="redo"]').onclick=()=>History.doRedo();
