@@ -113,6 +113,8 @@ button:disabled{cursor:not-allowed}
   transition:transform .14s ease, background .14s ease, box-shadow .14s ease, color .14s ease}
 .tool:hover,.tool:focus-visible{background:#eef3fb; color:var(--ink); transform:translateX(1px) scale(1.05); box-shadow:var(--shadow-soft)}
 .tool.active{background:var(--accent); color:#fff; box-shadow:0 4px 12px rgba(52,120,246,.28)}
+/* pen toggle = which kind of node new gestures create (distinct hue from action tools) */
+.pen-tool.active{background:#0ea5a4; color:#fff; box-shadow:0 4px 12px rgba(14,165,164,.28)}
 .tool[data-tip]::after{content:attr(data-tip); position:absolute; left:calc(100% + 10px); top:50%;
   transform:translateY(-50%) translateX(-4px); opacity:0; pointer-events:none; white-space:nowrap;
   background:#1d2430; color:#fff; padding:6px 8px; border-radius:8px; font-size:12px; font-weight:500;

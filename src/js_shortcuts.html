@@ -37,8 +37,8 @@ const Shortcuts = {
     if(!mod && e.key.toLowerCase()==='s'){ App.setTool('section'); return; }
 
     const ids=Selection.nodeIds();
-    const tree=State.project.mode==='tree';
-    if(e.key==='Tab' && tree && ids.length===1){ e.preventDefault(); Tree.addChild(ids[0]); return; }
+    const tree = ids.length===1 && Tree.isTreeNode(State.getNode(ids[0]));
+    if(e.key==='Tab' && tree){ e.preventDefault(); Tree.addChild(ids[0]); return; }
     if(e.key==='Enter' && ids.length===1){ e.preventDefault(); if(tree) Tree.addSibling(ids[0]); else Nodes.beginEdit(ids[0],'text'); return; }
     if(e.key==='F2' && ids.length===1){ e.preventDefault(); Nodes.beginEdit(ids[0],'text'); return; }
 
@@ -63,7 +63,7 @@ const Shortcuts = {
 
   nudge(dx,dy){
     let ids=Selection.nodeIds(); if(!ids.length) return;
-    if(State.project.mode==='tree'){ const set=new Set(ids); ids.forEach(id=>Tree.descendants(id).forEach(d=>set.add(d))); ids=[...set]; }
+    const set=new Set(ids); ids.forEach(id=>Tree.descendants(id).forEach(d=>set.add(d))); ids=[...set];
     const snap=mcClone(State.project);
     ids.forEach(id=>{ const n=State.getNode(id); n.x+=dx; n.y+=dy; });
     History.pushSnapshot(snap); State.touchRender();

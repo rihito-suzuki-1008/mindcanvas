@@ -56,10 +56,10 @@ const Nodes = {
     }
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
     el.classList.toggle('selected', Selection.hasNode(n.id));
-    el.classList.toggle('freeform-node', State.project.mode==='freeform');
+    el.classList.toggle('freeform-node', n.kind==='free');
     // tree collapse toggle
     const tg=el.querySelector('.collapse-toggle');
-    if(State.project.mode==='tree' && this.hasChildren(n.id)){
+    if(n.kind==='tree' && this.hasChildren(n.id)){
       tg.hidden=false; tg.textContent=n.collapsed?'+':'−';
       tg.style.right='-9px'; tg.style.top='50%'; tg.style.transform='translateY(-50%)';
       el.classList.toggle('collapsed-parent', !!n.collapsed);
@@ -88,7 +88,7 @@ const Nodes = {
     if(this._which==='memo'){ el.querySelector('.node-memo').hidden=true; el.appendChild(ta); }
     else { el.querySelector('.node-md').style.display='none'; el.insertBefore(ta, el.firstChild); }
     const fit=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
-    ta.addEventListener('input',()=>{ fit(); if(State.project.mode==='tree'){ const sheet=State.activeSheet(); Tree.relayout(); this.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); } });
+    ta.addEventListener('input',()=>{ fit(); if(n.kind==='tree'){ const sheet=State.activeSheet(); Tree.relayout(); this.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); } });
     ta.addEventListener('keydown',(ev)=>this.onEditKey(ev,id));
     ta.addEventListener('blur',()=>this.commitEdit());
     this._editor=ta;
@@ -99,7 +99,7 @@ const Nodes = {
     ev.stopPropagation();
     // (1) IME 変換中の Enter/Tab はノード操作に使わない（日本語変換の確定 Enter で枝分かれさせない）
     if(ev.isComposing || ev.keyCode===229){ return; }
-    const tree=State.project.mode==='tree';
+    const tree=Tree.isTreeNode(State.getNode(id));
     if(ev.key==='Escape'){ ev.preventDefault(); this._editor.value=this._editOld; this._editor.blur(); return; }
     // (2) 編集を確定して選択モードへ戻る（枝分かれしない）: ツリー本文の Enter、または全モードの Ctrl/Cmd+Enter
     if(ev.key==='Enter' && !ev.shiftKey && ((tree && this._which==='text') || ev.ctrlKey || ev.metaKey)){
@@ -126,9 +126,9 @@ const Nodes = {
   /* ---------- create ---------- */
   createAt(wx,wy,opts){
     const snap=mcClone(State.project);
-    const o=opts||{}, d=State.nodeDefaults(State.project.mode);
+    const o=opts||{}, kind=o.kind||State.penKind(), d=State.nodeDefaults(kind);
     const w=o.w||d.w, h=o.h!=null?o.h:d.h;
-    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-w/2), y:Canvas.snap(wy-(h?h/2:20)), w:w, h:h, text:'' }, o));
+    const n=State.addNode(Object.assign({ x:Canvas.snap(wx-w/2), y:Canvas.snap(wy-(h?h/2:20)), w:w, h:h, text:'', kind:kind }, o));
     n._fresh=true;
     History.pushSnapshot(snap); State.touchRender();
     Selection.selectNode(n.id); this.refreshSelection();
@@ -147,7 +147,7 @@ const Nodes = {
     Edges.deselect(); App.updateAlignBar(); this.refreshSelection();
     if(!Selection.hasNode(id)) return;
 
-    const tree=State.project.mode==='tree';
+    const tree=Tree.isTreeNode(State.getNode(id));
     const duplicateDrag=!tree && e.altKey;
     const start=Canvas.screenToWorld(e.clientX,e.clientY);
     let ids=Selection.nodeIds();
@@ -191,7 +191,7 @@ const Nodes = {
     const n=State.getNode(id); const start=Canvas.screenToWorld(e.clientX,e.clientY);
     const el=this.els[id], w0=n.w, h0=n.h || (el?el.offsetHeight:State.MIN_NODE_H), x0=n.x, y0=n.y;
     const snap=mcClone(State.project); let moved=false;
-    const minW=State.MIN_NODE_W, minH=State.MIN_NODE_H, free=State.project.mode==='freeform';
+    const minW=State.MIN_NODE_W, minH=State.MIN_NODE_H, free=!Tree.isTreeNode(n);
     const move=(ev)=>{ const w=Canvas.screenToWorld(ev.clientX,ev.clientY), dx=w.x-start.x, dy=w.y-start.y;
       if(free){
         let nx=x0, ny=y0, nw=w0, nh=h0;
@@ -207,8 +207,8 @@ const Nodes = {
         n.w=Math.max(minW, State.prefs().snap?Canvas.snap(w0+dx):w0+dx);
       }
       moved=true;
-      if(State.project.mode==='tree'){ Tree.relayout(); }
-      const sheet=State.activeSheet(); this.applyPositions(); if(State.project.mode==='tree') Edges.renderBranches(sheet); Edges.render(sheet); };
+      if(Tree.isTreeNode(n)){ Tree.relayout(); }
+      const sheet=State.activeSheet(); this.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); };
     const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
       if(moved){ History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);

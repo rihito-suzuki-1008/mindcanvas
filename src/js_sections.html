@@ -48,7 +48,7 @@ const Sections = {
       const sx=pf.snap?Canvas.snap(nx):nx, sy=pf.snap?Canvas.snap(ny):ny;
       const sdx=sx-s0.x, sdy=sy-s0.y;
       sec.x=sx; sec.y=sy; kids.forEach(nid=>{ const n=State.getNode(nid); n.x=k0[nid].x+sdx; n.y=k0[nid].y+sdy; });
-      const sheet=State.activeSheet(); this.renderOne(sec); Nodes.applyPositions(); if(State.project.mode==='tree') Edges.renderBranches(sheet); Edges.render(sheet); };
+      const sheet=State.activeSheet(); this.renderOne(sec); Nodes.applyPositions(); Edges.renderBranches(sheet); Edges.render(sheet); };
     const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
       if(moved){ History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);

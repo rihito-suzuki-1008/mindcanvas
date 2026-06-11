@@ -73,32 +73,24 @@ const Home = {
     const mask=document.createElement('div'); mask.className='modal-mask';
     mask.innerHTML=
       '<div class="modal">'+
-        '<h2>新規プロジェクト</h2><p class="sub">作成後にモードは変更できません。</p>'+
+        '<h2>新規プロジェクト</h2><p class="sub">ツリーとフリーフォームはキャンバス上で自由に混在できます（左のツールバーで切替）。</p>'+
         '<label class="fld">プロジェクト名</label>'+
         '<input class="txt" id="np-name" placeholder="無題のプロジェクト" />'+
-        '<label class="fld">モード</label>'+
-        '<div class="mode-grid">'+
-          '<div class="mode-opt sel" data-mode="tree"><div class="ic">'+iconSvg('tree')+'</div><div class="nm">ツリー型</div><div class="ds">中心から枝分かれ。Tab/Enterで高速入力</div></div>'+
-          '<div class="mode-opt" data-mode="freeform"><div class="ic">'+iconSvg('freeform')+'</div><div class="nm">フリーフォーム</div><div class="ds">自由配置のホワイトボード</div></div>'+
-        '</div>'+
         '<div class="modal-actions"><button class="btn" data-x="cancel">キャンセル</button>'+
         '<button class="btn btn-primary" data-x="create">作成</button></div>'+
       '</div>';
-    let mode='tree';
-    mask.querySelectorAll('.mode-opt').forEach(o=>o.onclick=()=>{ mode=o.dataset.mode;
-      mask.querySelectorAll('.mode-opt').forEach(x=>x.classList.toggle('sel',x===o)); });
     const close=()=>mask.remove();
     mask.querySelector('[data-x="cancel"]').onclick=close;
     mask.querySelector('[data-x="create"]').onclick=()=>{
       const name=(mask.querySelector('#np-name').value||'').trim()||'無題のプロジェクト';
-      close(); this.create(name, mode);
+      close(); this.create(name);
     };
     mask.addEventListener('pointerdown',(e)=>{ if(e.target===mask) close(); });
     root.appendChild(mask);
     setTimeout(()=>mask.querySelector('#np-name').focus(),0);
   },
-  create(name,mode){
-    const p=State.newProject(name,mode);
+  create(name){
+    const p=State.newProject(name);
     Store.saveAndBackup(p);
     App.enterEditor(p);
   }

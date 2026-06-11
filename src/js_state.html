@@ -17,39 +17,40 @@ const State = {
     return p.sheets.find(s=>s.id===p.activeSheetId) || p.sheets[0];
   },
   prefs(){ return this.project ? (this.project.prefs || (this.project.prefs={grid:true,snap:true})) : {grid:true,snap:true}; },
-  nodeDefaults(mode){
-    return mode==='freeform' ? { w:this.FREE_NODE_W, h:this.FREE_NODE_H } : { w:this.NODE_W, h:0 };
+  penKind(){ return (typeof App!=='undefined' && App.penKind) || (this.project && this.project.penKind) || 'tree'; },
+  nodeDefaults(kind){
+    return kind==='free' ? { w:this.FREE_NODE_W, h:this.FREE_NODE_H } : { w:this.NODE_W, h:0 };
   },
 
   mkNode(props){
-    const d=this.nodeDefaults(this.project&&this.project.mode);
+    const o=props||{};
+    const kind=o.kind || this.penKind();
+    const d=this.nodeDefaults(kind);
     return Object.assign({
-      id:uid('n'), x:0, y:0, w:d.w, h:d.h,
+      id:uid('n'), x:0, y:0, w:d.w, h:d.h, kind:kind,
       text:'アイデア', memo:'', parentId:null, collapsed:false, groupId:null
-    }, props||{});
+    }, o);
   },
-  blankSheet(id,name,mode){
+  blankSheet(id,name){
     const sheet={ id:id||uid('sh'), name:name||'シート1', nodes:{}, edges:{}, sections:{}, viewport:{x:120,y:90,zoom:1} };
-    if(mode==='tree'){
-      const root=this.mkNode({ x:80, y:300, text:'# 中心テーマ' });
-      sheet.nodes[root.id]=root;
-    }
+    const root=this.mkNode({ x:80, y:300, text:'# 中心テーマ', kind:'tree' });
+    sheet.nodes[root.id]=root;
     return sheet;
   },
-  newProject(name,mode){
+  newProject(name){
     const sid=uid('sh');
     return {
-      id:uid('pj'), name:name||'無題のプロジェクト', mode:(mode==='tree'?'tree':'freeform'),
+      id:uid('pj'), name:name||'無題のプロジェクト', mode:'tree', penKind:'tree',
       createdAt:Date.now(), updatedAt:Date.now(), activeSheetId:sid,
       prefs:{grid:true, snap:true},
-      sheets:[ this.blankSheet(sid,'シート1',mode) ]
+      sheets:[ this.blankSheet(sid,'シート1') ]
     };
   },
 
   /* sheets */
   addSheet(name){
     const p=this.project; if(!p) return;
-    const s=this.blankSheet(uid('sh'), name||('シート'+(p.sheets.length+1)), p.mode);
+    const s=this.blankSheet(uid('sh'), name||('シート'+(p.sheets.length+1)));
     this.commit(()=>{ p.sheets.push(s); p.activeSheetId=s.id; });
     return s;
   },
@@ -81,13 +82,11 @@ const State = {
   removeNodes(ids){
     const s=this.activeSheet(); if(!s) return;
     const set=new Set(ids);
-    // also remove descendants in tree mode
-    if(this.project.mode==='tree'){
-      let added=true;
-      while(added){ added=false;
-        for(const id in s.nodes){ const n=s.nodes[id];
-          if(n.parentId && set.has(n.parentId) && !set.has(id)){ set.add(id); added=true; } } }
-    }
+    // also remove tree descendants (free nodes have no parentId, so this is a no-op for them)
+    let added=true;
+    while(added){ added=false;
+      for(const id in s.nodes){ const n=s.nodes[id];
+        if(n.parentId && set.has(n.parentId) && !set.has(id)){ set.add(id); added=true; } } }
     set.forEach(id=>{ delete s.nodes[id]; });
     for(const eid in s.edges){ const e=s.edges[eid]; if(set.has(e.from)||set.has(e.to)) delete s.edges[eid]; }
   },
