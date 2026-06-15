@@ -105,6 +105,14 @@ const Exporter = {
     const sid=(id)=>'n_'+id.replace(/[^a-zA-Z0-9_]/g,'');
     const secid=(id)=>'sec_'+id.replace(/[^a-zA-Z0-9_]/g,'');
     const tx=(n)=>this.label(n).replace(/"/g,"'").replace(/[\[\]]/g,'');
+    const styleLine=(id,st)=>{
+      if(!st || (!st.fill&&!st.stroke&&!st.text)) return null;
+      const parts=[];
+      if(st.fill) parts.push('fill:'+st.fill);
+      if(st.stroke) parts.push('stroke:'+st.stroke);
+      if(st.text) parts.push('color:'+st.text);
+      return '  style '+id+' '+parts.join(',');
+    };
     const L=['flowchart LR'];
     const sm=this.sectionMap(sh);
     Object.values(sh.sections||{}).sort((a,b)=>a.y-b.y || a.x-b.x).forEach(sec=>{
@@ -116,6 +124,8 @@ const Exporter = {
     for(const id in sh.nodes){ const n=sh.nodes[id]; if(n.kind==='tree' && n.parentId && sh.nodes[n.parentId]) L.push('  '+sid(n.parentId)+' --> '+sid(id)); }
     for(const eid in sh.edges){ const e=sh.edges[eid]; if(sh.nodes[e.from]&&sh.nodes[e.to])
       L.push('  '+sid(e.from)+(e.label?' -->|'+e.label.replace(/"/g,"'")+'| ':' --> ')+sid(e.to)); }
+    Object.values(sh.sections||{}).forEach(sec=>{ const line=styleLine(secid(sec.id),sec.style); if(line) L.push(line); });
+    for(const id in sh.nodes){ const line=styleLine(sid(id),sh.nodes[id].style); if(line) L.push(line); }
     return L.join('\n');
   },
 

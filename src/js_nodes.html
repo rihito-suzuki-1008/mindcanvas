@@ -55,6 +55,9 @@ const Nodes = {
       if(n.memo){ memo.hidden=false; memo.textContent=n.memo; } else memo.hidden=true;
     }
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
+    el.style.background=(n.style&&n.style.fill)||'';
+    el.style.borderColor=(n.style&&n.style.stroke)||'';
+    el.style.color=(n.style&&n.style.text)||'';
     el.classList.toggle('selected', Selection.hasNode(n.id));
     el.classList.toggle('freeform-node', n.kind==='free');
     // tree collapse toggle

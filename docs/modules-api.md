@@ -104,6 +104,7 @@
 | `prune()` | 存在しない ID を除去 |
 | `deleteSelected()` | 選択削除（エッジ優先 → ノード/セクション） |
 | `group()` / `ungroup()` | グループ化/解除 |
+| `defaultStyle(part)` / `styleValue(part)` / `applyStyle(part,color)` | 枠線・塗り・文字色の参照/一括適用 |
 | `align(type)` | left/right/hcenter/top/bottom/vcenter/hdist/vdist |
 | `startMarquee(e)` | 矩形選択 |
 
@@ -129,7 +130,7 @@
 | `init()` | 全モジュール初期化 + UI 結線 + ホーム表示 |
 | `enterEditor(p)` / `openProject(id)` / `showHome()` | 遷移 |
 | `render()` | アクティブシート描画（[architecture 2.3](architecture.md) の順序） |
-| `setTool(t)` / `updateToolbar()` / `updateAlignBar()` / `updateSheetTabs()` / `closeMenus()` | UI |
+| `setTool(t)` / `updateToolbar()` / `updateAlignBar()` / `updateStyleBar()` / `updateSheetTabs()` / `closeMenus()` | UI |
 | `copy()` / `cut()` / `paste()` | クリップボード（id 再採番・内部エッジ/グループ複製）。ツリー型で単一ノード選択中の `paste()` は子ノード追加として扱う |
 | `pasteTextAsChildren(parentId,text)` / `pasteNodesAsChildren(parentId)` | ツリー型の選択ノード配下ペースト |
 | `toast(msg)` | 通知 |
