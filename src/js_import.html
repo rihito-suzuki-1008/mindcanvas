@@ -1,0 +1,157 @@
+<script>
+const Importer = {
+  init(){
+    const btn=document.getElementById('btn-import');
+    if(btn) btn.onclick=()=>this.show();
+  },
+
+  show(){
+    const root=document.getElementById('modal-root');
+    const mask=document.createElement('div'); mask.className='modal-mask';
+    mask.innerHTML='<div class="modal" style="width:640px">'+
+      '<h2>Mermaidインポート</h2>'+
+      '<p class="sub">flowchart / graph のノード、接続、subgraphを新規シートに取り込みます。</p>'+
+      '<textarea id="import-text" class="import-text" spellcheck="false" placeholder="flowchart LR&#10;  A[開始] --> B[終了]"></textarea>'+
+      '<div class="modal-actions">'+
+        '<button class="btn" data-close>閉じる</button>'+
+        '<button class="btn btn-primary" data-import>インポート</button>'+
+      '</div>'+
+    '</div>';
+    root.appendChild(mask);
+    const ta=mask.querySelector('#import-text');
+    mask.querySelector('[data-close]').onclick=()=>mask.remove();
+    mask.querySelector('[data-import]').onclick=()=>{
+      const result=this.importMermaid(ta.value);
+      if(result.ok) mask.remove();
+    };
+    mask.addEventListener('click',(e)=>{ if(e.target===mask) mask.remove(); });
+    setTimeout(()=>ta.focus(),0);
+  },
+
+  importMermaid(text){
+    const parsed=this.parseMermaid(text);
+    if(!parsed.nodes.length){
+      App.toast('インポートできるノードがありません');
+      return {ok:false};
+    }
+    const snap=mcClone(State.project);
+    const sheet=this.buildSheet(parsed);
+    State.project.sheets.push(sheet);
+    State.project.activeSheetId=sheet.id;
+    Selection.clear(); Edges.deselect();
+    History.pushSnapshot(snap); State.touchRender(); Canvas.fit();
+    const msg=parsed.warnings.length ? 'インポートしました（未対応行 '+parsed.warnings.length+'件）' : 'インポートしました';
+    App.toast(msg);
+    return {ok:true};
+  },
+
+  parseMermaid(text){
+    const nodes={}, edges=[], sections=[], warnings=[];
+    let currentSection=null;
+    const ensureNode=(id,label)=>{
+      if(!id) return null;
+      if(!nodes[id]) nodes[id]={ id:id, label:label||this.cleanId(id), sectionId:null };
+      else if(label) nodes[id].label=label;
+      if(currentSection && !nodes[id].sectionId) nodes[id].sectionId=currentSection.id;
+      return nodes[id];
+    };
+    String(text||'').split(/\r?\n/).forEach((raw,idx)=>{
+      let line=raw.trim();
+      if(!line || line.indexOf('%%')===0) return;
+      line=line.replace(/;$/,'').trim();
+      if(/^(flowchart|graph)\b/i.test(line)) return;
+      if(/^classDef\b|^class\b|^style\b|^linkStyle\b/i.test(line)) return;
+      if(/^end$/i.test(line)){ currentSection=null; return; }
+      const sg=line.match(/^subgraph\s+(.+)$/i);
+      if(sg){
+        const expr=this.parseNodeExpr(sg[1]);
+        const sec={ id:expr.id||uid('sec'), label:expr.label||this.cleanId(expr.id)||'セクション' };
+        sections.push(sec); currentSection=sec; return;
+      }
+      const edge=this.parseEdge(line);
+      if(edge){
+        ensureNode(edge.from.id, edge.from.label);
+        ensureNode(edge.to.id, edge.to.label);
+        edges.push({ from:edge.from.id, to:edge.to.id, label:edge.label||'' });
+        return;
+      }
+      const node=this.parseNodeExpr(line);
+      if(node.id && node.label){ ensureNode(node.id,node.label); return; }
+      warnings.push({line:idx+1, text:raw});
+    });
+    return { nodes:Object.values(nodes), edges:edges, sections:sections, warnings:warnings };
+  },
+
+  parseEdge(line){
+    let m=line.match(/^(.+?)\s*[-.=]+>\s*(?:\|([^|]*)\|\s*)?(.+)$/);
+    if(!m) m=line.match(/^(.+?)\s*--\s*(.*?)\s*-->\s*(.+)$/);
+    if(!m) return null;
+    return {
+      from:this.parseNodeExpr(m[1]),
+      label:(m[2]||'').trim(),
+      to:this.parseNodeExpr(m[3])
+    };
+  },
+
+  parseNodeExpr(expr){
+    const s=String(expr||'').trim();
+    const idMatch=s.match(/^([A-Za-z0-9_:-]+)/);
+    const id=idMatch?idMatch[1]:'';
+    const rest=id?s.slice(id.length).trim():s;
+    return { id:id, label:this.extractLabel(rest) };
+  },
+
+  extractLabel(rest){
+    const s=String(rest||'').trim();
+    const patterns=[
+      /^\[\s*"([^"]*)"\s*\]$/, /^\[\s*'([^']*)'\s*\]$/, /^\[\s*([^\]]+)\s*\]$/,
+      /^\(\s*"([^"]*)"\s*\)$/, /^\(\s*'([^']*)'\s*\)$/, /^\(\s*([^)]+)\s*\)$/,
+      /^\{\s*"([^"]*)"\s*\}$/, /^\{\s*'([^']*)'\s*\}$/, /^\{\s*([^}]+)\s*\}$/
+    ];
+    for(let i=0;i<patterns.length;i++){ const m=s.match(patterns[i]); if(m) return this.unquote(m[1]); }
+    return '';
+  },
+
+  unquote(s){ return String(s||'').replace(/<br\s*\/?>/gi,'\n').replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim(); },
+  cleanId(id){ return String(id||'').replace(/^n_/,'').replace(/[_-]+/g,' ').trim(); },
+
+  buildSheet(parsed){
+    const sheet={ id:uid('sh'), name:'Mermaid import '+(State.project.sheets.length+1), nodes:{}, edges:{}, sections:{}, viewport:{x:120,y:90,zoom:1} };
+    const levels=this.levels(parsed.nodes, parsed.edges), byOld={};
+    parsed.nodes.forEach((n,i)=>{
+      const level=levels[n.id]||0;
+      const row=parsed.nodes.filter(x=>(levels[x.id]||0)===level).findIndex(x=>x.id===n.id);
+      const nn=State.mkNode({ kind:'free', parentId:null, text:n.label||this.cleanId(n.id), x:80+level*280, y:100+row*140, w:State.FREE_NODE_W, h:State.FREE_NODE_H });
+      sheet.nodes[nn.id]=nn; byOld[n.id]=nn.id;
+    });
+    parsed.edges.forEach(e=>{
+      if(!byOld[e.from]||!byOld[e.to]) return;
+      const ne={ id:uid('e'), from:byOld[e.from], to:byOld[e.to], fromSide:null, toSide:null, kind:'straight', label:e.label||'', directed:true };
+      sheet.edges[ne.id]=ne;
+    });
+    parsed.sections.forEach(sec=>{
+      const members=parsed.nodes.filter(n=>n.sectionId===sec.id).map(n=>sheet.nodes[byOld[n.id]]).filter(Boolean);
+      if(!members.length) return;
+      const minX=Math.min(...members.map(n=>n.x)), minY=Math.min(...members.map(n=>n.y));
+      const maxX=Math.max(...members.map(n=>n.x+n.w)), maxY=Math.max(...members.map(n=>n.y+(n.h||State.FREE_NODE_H)));
+      const s=State.addSection.call({activeSheet:()=>sheet},{ id:uid('sec'), title:sec.label, x:minX-40, y:minY-50, w:maxX-minX+80, h:maxY-minY+90 });
+      sheet.sections[s.id]=s;
+    });
+    return sheet;
+  },
+
+  levels(nodes, edges){
+    const ids=nodes.map(n=>n.id), indeg={}, out={};
+    ids.forEach(id=>{ indeg[id]=0; out[id]=[]; });
+    edges.forEach(e=>{ if(out[e.from]&&indeg[e.to]!=null){ out[e.from].push(e.to); indeg[e.to]++; } });
+    const q=ids.filter(id=>indeg[id]===0), level={};
+    q.forEach(id=>level[id]=0);
+    while(q.length){
+      const id=q.shift();
+      out[id].forEach(to=>{ level[to]=Math.max(level[to]||0,(level[id]||0)+1); indeg[to]--; if(indeg[to]===0) q.push(to); });
+    }
+    ids.forEach(id=>{ if(level[id]==null) level[id]=0; });
+    return level;
+  }
+};
+</script>

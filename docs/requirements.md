@@ -112,6 +112,7 @@
 
 ### FR-9 エクスポート
 <!-- 2026-06-10: セクションをMarkdown/Mermaid exportに反映。Mermaidはsubgraphを使う。 -->
+<!-- 2026-06-15 / #19: Mermaid import は既存シートを変更せず、新規シートへ取り込む。 -->
 
 | ID | 要件 |
 |---|---|
@@ -120,6 +121,8 @@
 | FR-9.3 | Markdown（プロジェクト全シート。ツリーはネスト、フリーは一覧+接続）。 |
 | FR-9.4 | Mermaid（現在シートを `flowchart LR`）。 |
 | FR-9.5 | セクションはMarkdown exportでまとまりとして出力し、Mermaid exportでは `subgraph` として出力する。 |
+| FR-9.6 | Mermaid import は `flowchart` / `graph` のノード、`-->` 接続、`subgraph` を読み取り、新規シートにノード・エッジ・セクションとして配置する。 |
+| FR-9.6a | Mermaid import で未対応の行は無視し、件数を通知する。 |
 
 ---
 

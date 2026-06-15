@@ -116,6 +116,9 @@
 ## Exporter（js_export）
 `run(kind)`（'png'|'pdf'|'md'|'mermaid'）/ `capture()`（fit→html-to-image→復元）/ `png()` / `pdf()` / `markdown()` / `mermaid()` / `showText(title,text,ext)`
 
+## Importer（js_import）
+`init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `buildSheet(parsed)` / `levels(nodes,edges)`
+
 ## Shortcuts（js_shortcuts）
 `init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`
 

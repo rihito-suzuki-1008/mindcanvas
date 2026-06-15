@@ -18,6 +18,7 @@
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V20h-5v-6H9v6H4v-8.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v3h14v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -66,6 +67,7 @@
         <div class="spacer"></div>
         <span id="sync-status" class="sync-status" title="保存状態">—</span>
         <button id="btn-search" class="icon-btn" title="検索 (Ctrl+F)" aria-label="検索"><svg class="i" aria-hidden="true"><use href="#i-search"></use></svg></button>
+        <button id="btn-import" class="btn"><svg class="i" aria-hidden="true"><use href="#i-import"></use></svg>インポート</button>
         <div class="menu-wrap">
           <button id="btn-export" class="btn">エクスポート <svg class="i tiny" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
           <div id="export-menu" class="menu" hidden>
@@ -163,6 +165,7 @@
   <?!= include('js_minimap'); ?>
   <?!= include('js_search'); ?>
   <?!= include('js_export'); ?>
+  <?!= include('js_import'); ?>
   <?!= include('js_shortcuts'); ?>
   <?!= include('js_home'); ?>
   <?!= include('js_app'); ?>

@@ -73,6 +73,20 @@ flowchart LR
 - [コピー]（`execCommand('copy')`）/ [ダウンロード(.ext)] / [閉じる]。
 - マスク外クリックで閉じる。
 
-## 7.5 ダウンロードヘルパー
+## 7.5 Mermaidインポート `Importer.importMermaid(text)`
+
+- エディタ右上「インポート」から Mermaid テキストを貼り付ける。
+- 既存シートは変更せず、`Mermaid import N` という新規シートを作成して取り込む。
+- 対応範囲：
+  - `flowchart` / `graph` の宣言行
+  - `A["ラベル"]` / `A[ラベル]` / `A(ラベル)` / `A{ラベル}` 形式のノード
+  - `A --> B` / `A -->|ラベル| B` / `A -- ラベル --> B` 形式の接続
+  - `subgraph id["ラベル"] ... end` をセクションとして変換
+- ノードはフリーフォームノードとして段組み配置し、接続は明示エッジとして作成する。
+- 未対応行は無視し、インポート後に件数をtoastで通知する。
+
+<!-- 2026-06-15 / #19: Mermaid import を追加。まずはMindCanvasのMermaid exportで出す基本形式を戻せることを優先する。 -->
+
+## 7.6 ダウンロードヘルパー
 - `downloadURL(url, filename)`：`<a download>` を生成してクリック。
 - `downloadText(text, filename, mime)`：`Blob` から Object URL を作りダウンロード。

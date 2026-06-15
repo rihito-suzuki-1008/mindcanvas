@@ -3,7 +3,7 @@ const App = {
   screen:'home', tool:'select', penKind:'tree', spaceDown:false, clipboard:null, clipboardText:'',
 
   init(){
-    Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Shortcuts.init(); Home.init();
+    Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Importer.init(); Shortcuts.init(); Home.init();
     this.wireUI();
     Store.initBackend(()=>Home.show());
   },
