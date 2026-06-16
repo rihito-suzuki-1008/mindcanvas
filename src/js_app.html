@@ -1,6 +1,7 @@
 <script>
 const App = {
   screen:'home', tool:'select', penKind:'tree', spaceDown:false, clipboard:null, clipboardText:'',
+  imageMaxSide:1600, imageMaxBytes:8*1024*1024,
 
   init(){
     Canvas.init(); Nodes.init(); Sections.init(); Edges.init(); Minimap.init(); Search.init(); Importer.init(); Shortcuts.init(); Home.init();
@@ -46,7 +47,7 @@ const App = {
     Edges.renderBranches(sheet);
     Edges.render(sheet); Sections.render(sheet);
     Canvas.apply();
-    this.updateSheetTabs(); this.updateAlignBar(); History.update();
+    this.updateSheetTabs(); this.updateAlignBar(); this.updateStyleBar(); History.update();
   },
 
   /* ---------- tools / toolbar ---------- */
@@ -64,7 +65,88 @@ const App = {
     if(s) s.classList.toggle('active', !!pf.snap);
   },
   updateAlignBar(){ document.getElementById('align-bar').hidden = Selection.nodes.size<2; },
+  updateStyleBar(){
+    const bar=document.getElementById('style-bar'); if(!bar) return;
+    const any=Selection.nodes.size || Selection.sections.size;
+    bar.hidden=!any;
+    if(!any) return;
+    bar.querySelectorAll('input[data-style]').forEach(input=>{
+      const color=Selection.styleValue(input.dataset.style);
+      input.value=color;
+      input.parentNode.style.color=color;
+    });
+  },
   closeMenus(){ const m=document.getElementById('export-menu'); if(m) m.hidden=true; },
+
+  /* ---------- images ---------- */
+  chooseImage(){
+    const input=document.getElementById('image-upload');
+    if(!input) return;
+    input.value='';
+    input.click();
+  },
+  async onImagePicked(e){
+    const file=e.target.files && e.target.files[0];
+    if(!file) return;
+    if(!/^image\//.test(file.type)){ this.toast('画像ファイルを選択してください'); return; }
+    if(file.size>this.imageMaxBytes){ this.toast('画像は8MB以下にしてください'); return; }
+    try{
+      const asset=await this.prepareImageAsset(file);
+      const center=this.stageCenterWorld();
+      const snap=mcClone(State.project);
+      const w=Canvas.snap(asset.w), h=Canvas.snap(asset.h);
+      const n=State.addNode({
+        kind:'free', type:'image', text:asset.name, memo:'', parentId:null, collapsed:false,
+        x:Canvas.snap(center.x-w/2), y:Canvas.snap(center.y-h/2), w:w, h:h,
+        image:{ src:asset.src, name:asset.name, mime:asset.mime, originalSize:file.size, width:asset.naturalW, height:asset.naturalH }
+      });
+      History.pushSnapshot(snap); State.touchRender();
+      Selection.selectNode(n.id); Nodes.refreshSelection();
+      this.toast('画像を追加しました');
+    }catch(err){
+      this.toast('画像を読み込めませんでした');
+    }
+  },
+  stageCenterWorld(){
+    const r=Canvas.rect();
+    return Canvas.screenToWorld(r.left+r.width/2, r.top+r.height/2);
+  },
+  readFileAsDataURL(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  },
+  loadImage(src){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=reject;
+      img.src=src;
+    });
+  },
+  async prepareImageAsset(file){
+    const src=await this.readFileAsDataURL(file);
+    const isRaster=/^image\/(png|jpe?g|webp)$/i.test(file.type);
+    const img=await this.loadImage(src);
+    const naturalW=img.naturalWidth||img.width||State.FREE_NODE_W;
+    const naturalH=img.naturalHeight||img.height||State.FREE_NODE_H;
+    const fitScale=Math.min(1, this.imageMaxSide/Math.max(naturalW,naturalH));
+    const outW=Math.max(1, Math.round(naturalW*fitScale));
+    const outH=Math.max(1, Math.round(naturalH*fitScale));
+    const displayScale=Math.min(1, 320/outW, 240/outH);
+    const w=Math.max(State.MIN_NODE_W, Math.round(outW*displayScale));
+    const h=Math.max(State.MIN_NODE_H, Math.round(outH*displayScale));
+    if(!isRaster || fitScale>=1) return { src:src, name:file.name, mime:file.type, w:w, h:h, naturalW:naturalW, naturalH:naturalH };
+    const canvas=document.createElement('canvas');
+    canvas.width=outW; canvas.height=outH;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0,outW,outH);
+    const mime=file.type==='image/png'?'image/png':'image/jpeg';
+    return { src:canvas.toDataURL(mime, .88), name:file.name, mime:mime, w:w, h:h, naturalW:naturalW, naturalH:naturalH };
+  },
 
   /* ---------- sheet tabs ---------- */
   updateSheetTabs(){
@@ -182,13 +264,19 @@ const App = {
     document.querySelector('.tool[data-act="undo"]').onclick=()=>History.doUndo();
     document.querySelector('.tool[data-act="redo"]').onclick=()=>History.doRedo();
     document.querySelector('.tool[data-act="fit"]').onclick=()=>Canvas.fit();
+    document.querySelector('.tool[data-act="image"]').onclick=()=>this.chooseImage();
     document.querySelector('.tool[data-act="grid"]').onclick=()=>{ const pf=State.prefs(); pf.grid=!pf.grid; Canvas.apply(); this.updateToolbar(); Store.scheduleSave(); };
     document.querySelector('.tool[data-act="snap"]').onclick=()=>{ const pf=State.prefs(); pf.snap=!pf.snap; this.updateToolbar(); Store.scheduleSave(); };
+    const imageInput=document.getElementById('image-upload');
+    if(imageInput) imageInput.addEventListener('change',(e)=>this.onImagePicked(e));
 
     // align bar
     document.querySelectorAll('#align-bar [data-align]').forEach(b=>b.onclick=()=>{
       const a=b.dataset.align;
       if(a==='group') Selection.group(); else if(a==='ungroup') Selection.ungroup(); else Selection.align(a);
+    });
+    document.querySelectorAll('#style-bar input[data-style]').forEach(input=>{
+      input.addEventListener('change',()=>Selection.applyStyle(input.dataset.style, input.value));
     });
 
     // export menu

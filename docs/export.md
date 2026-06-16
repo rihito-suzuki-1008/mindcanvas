@@ -58,7 +58,10 @@
   - ツリーモードは `parentId` から `親sid --> 子sid`。
   - 明示エッジは `from -->|ラベル| to`（ラベルが無ければ `-->`）。
 - セクションは `subgraph <secid>["<セクション名>"] ... end` として出力する。
+- ノード/セクションに色指定がある場合は、Mermaid の `style <id> fill:<色>,stroke:<色>,color:<色>` 行として出力する。Markdownには色指定を出力しない。
 - 出力テキストはモーダル（`showText`）に表示し、コピー / `.mmd` ダウンロード可能。
+
+<!-- 2026-06-15 / #18: Mermaid export に Node/Section の style を反映。 -->
 
 ### 出力例
 ```

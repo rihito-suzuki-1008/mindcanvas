@@ -20,7 +20,12 @@ const Sections = {
       this.layer.appendChild(el); this.els[sec.id]=el;
     }
     el.style.left=sec.x+'px'; el.style.top=sec.y+'px'; el.style.width=sec.w+'px'; el.style.height=sec.h+'px';
-    el.querySelector('.section-title').textContent=sec.title||'セクション';
+    el.style.background=(sec.style&&sec.style.fill)||'';
+    el.style.borderColor=(sec.style&&sec.style.stroke)||'';
+    const title=el.querySelector('.section-title');
+    title.textContent=sec.title||'セクション';
+    title.style.color=(sec.style&&sec.style.text)||'';
+    title.style.borderColor=(sec.style&&sec.style.stroke)||'';
     el.classList.toggle('selected', Selection.hasSection(sec.id));
   },
 
