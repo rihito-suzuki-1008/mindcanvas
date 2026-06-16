@@ -130,6 +130,7 @@
 | `enterEditor(p)` / `openProject(id)` / `showHome()` | 遷移 |
 | `render()` | アクティブシート描画（[architecture 2.3](architecture.md) の順序） |
 | `setTool(t)` / `updateToolbar()` / `updateAlignBar()` / `updateSheetTabs()` / `closeMenus()` | UI |
+| `chooseImage()` / `onImagePicked(e)` / `prepareImageAsset(file)` | 画像アップロード。画像を必要に応じて縮小し、画像ノードとして追加 |
 | `copy()` / `cut()` / `paste()` | クリップボード（id 再採番・内部エッジ/グループ複製）。ツリー型で単一ノード選択中の `paste()` は子ノード追加として扱う |
 | `pasteTextAsChildren(parentId,text)` / `pasteNodesAsChildren(parentId)` | ツリー型の選択ノード配下ペースト |
 | `toast(msg)` | 通知 |
