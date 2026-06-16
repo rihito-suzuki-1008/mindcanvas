@@ -56,7 +56,12 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
   parentId: null,     // ツリー階層（freeform では常に null）
   collapsed: false,   // ツリー折りたたみ
   groupId: null,      // グループ識別子（同値の Node は一緒に移動・選択）
-  image: null         // type==="image" のとき ImageAsset
+  image: null,        // type==="image" のとき ImageAsset
+  style: {            // 省略可。未指定項目はCSS既定値
+    stroke: "#d7dde7",
+    fill: "#ffffff",
+    text: "#1d2430"
+  }
 }
 ```
 
@@ -73,6 +78,7 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
 ```
 
 <!-- 2026-06-15: 画像アップロードはDrive追加APIを増やさず、プロジェクトJSON内の画像ノードとして保存する。ラスター画像はクライアント側で長辺1600px以内に縮小する。 -->
+<!-- 2026-06-15 / #18: 色付けは `style.stroke` / `style.fill` / `style.text` として保存する。 -->
 
 | transient（保存しない / 実行時のみ） | 意味 |
 |---|---|
@@ -105,7 +111,12 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
   id: "sec_xxx",
   x: 0, y: 0,         // ワールド座標（左上）
   w: 300, h: 200,
-  title: "セクション"
+  title: "セクション",
+  style: {            // 省略可。未指定項目はCSS既定値
+    stroke: "#d7dde7",
+    fill: "#ffffff",
+    text: "#1d2430"
+  }
 }
 ```
 - 移動時、ドラッグ開始時点で**矩形内に中心が入るノード**を内包扱いとして一緒に移動。

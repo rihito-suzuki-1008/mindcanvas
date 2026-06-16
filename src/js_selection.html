@@ -13,7 +13,7 @@ const Selection = {
   sectionIds(){ return [...this.sections]; },
 
   clear(){ this.nodes.clear(); this.sections.clear(); },
-  refresh(){ Nodes.refreshSelection(); if(State.activeSheet()) Sections.render(State.activeSheet()); App.updateAlignBar(); },
+  refresh(){ Nodes.refreshSelection(); if(State.activeSheet()) Sections.render(State.activeSheet()); App.updateAlignBar(); App.updateStyleBar(); },
 
   selectNode(id){ this.clear(); this.groupPeers(id).forEach(p=>this.nodes.add(p)); Edges.deselect(); this.refresh(); },
   toggleNode(id){ const peers=this.groupPeers(id);
@@ -43,6 +43,29 @@ const Selection = {
   ungroup(){ if(!this.nodes.size) return; const snap=mcClone(State.project); let any=false;
     this.nodes.forEach(id=>{ const n=State.getNode(id); if(n&&n.groupId){ n.groupId=null; any=true; } });
     if(any){ History.pushSnapshot(snap); State.touchRender(); } },
+
+  /* ---------- style ---------- */
+  defaultStyle(part){
+    if(part==='stroke') return '#d7dde7';
+    if(part==='fill') return '#ffffff';
+    return '#1d2430';
+  },
+  styleValue(part){
+    const s=State.activeSheet(); if(!s) return this.defaultStyle(part);
+    const ids=this.nodeIds(), secs=this.sectionIds();
+    let item=null;
+    if(ids.length) item=s.nodes[ids[0]];
+    else if(secs.length) item=s.sections[secs[0]];
+    return (item && item.style && item.style[part]) || this.defaultStyle(part);
+  },
+  applyStyle(part,color){
+    if(!/^#[0-9a-fA-F]{6}$/.test(color||'')) return;
+    if(!this.nodes.size && !this.sections.size) return;
+    const snap=mcClone(State.project), s=State.activeSheet();
+    this.nodes.forEach(id=>{ const n=s.nodes[id]; if(n){ n.style=n.style||{}; n.style[part]=color; } });
+    this.sections.forEach(id=>{ const sec=s.sections[id]; if(sec){ sec.style=sec.style||{}; sec.style[part]=color; } });
+    History.pushSnapshot(snap); State.touchRender();
+  },
 
   /* ---------- align / distribute ---------- */
   align(type){
