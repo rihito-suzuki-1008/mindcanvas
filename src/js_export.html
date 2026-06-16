@@ -1,7 +1,8 @@
 <script>
 const Exporter = {
   fname(extra){ const s=(State.project.name||'mindcanvas').replace(/[\\/:*?"<>|]/g,'_'); return extra?s+'_'+extra:s; },
-  label(n){ let t=((n.text||'').split('\n')[0]||'').trim();
+  label(n){ if(n&&n.type==='image') return (n.image&&n.image.name)||n.text||'画像';
+    let t=((n.text||'').split('\n')[0]||'').trim();
     t=t.replace(/^#{1,6}\s*/,'').replace(/^[-*+]\s+/,'').replace(/\*\*/g,'').replace(/`/g,'').trim();
     return t||'(空)'; },
   sectionLabel(sec){ return (sec.title||'セクション').replace(/"/g,"'").replace(/[\[\]]/g,'').trim()||'セクション'; },

@@ -27,6 +27,7 @@ const Nodes = {
     if(!el){
       el=document.createElement('div'); el.className='node'; el.dataset.id=n.id;
       el.innerHTML=
+        '<div class="node-image" hidden><img alt=""></div>'+
         '<div class="node-md"></div>'+
         '<div class="node-memo" hidden></div>'+
         '<div class="handle t" data-side="t"></div><div class="handle r" data-side="r"></div>'+
@@ -38,7 +39,7 @@ const Nodes = {
         '<div class="resize-handle rh-sw" data-dir="sw"></div><div class="resize-handle rh-nw" data-dir="nw"></div>'+
         '<div class="grip"></div>';
       el.addEventListener('pointerdown',(e)=>this.onNodePointerDown(e,n.id));
-      el.addEventListener('dblclick',(e)=>{ e.stopPropagation(); this.beginEdit(n.id,'text'); });
+      el.addEventListener('dblclick',(e)=>{ e.stopPropagation(); if(!this.isImageNode(State.getNode(n.id))) this.beginEdit(n.id,'text'); });
       el.querySelectorAll('.handle').forEach(h=>h.addEventListener('pointerdown',(e)=>{
         e.stopPropagation(); Edges.startLink(e,n.id,h.dataset.side);
       }));
@@ -49,17 +50,30 @@ const Nodes = {
       el.querySelector('.collapse-toggle').addEventListener('click',(e)=>{ e.stopPropagation(); Tree.toggleCollapse(n.id); });
       this.layer.appendChild(el); this.els[n.id]=el;
     }
-    if(this.editingId!==n.id){
-      el.querySelector('.node-md').innerHTML=this.md(n.text);
+    const imageBox=el.querySelector('.node-image'), md=el.querySelector('.node-md');
+    if(this.isImageNode(n)){
+      const img=imageBox.querySelector('img');
+      imageBox.hidden=false; md.hidden=true;
+      img.src=n.image&&n.image.src?n.image.src:'';
+      img.alt=(n.image&&n.image.name)||n.text||'画像';
+    } else {
+      imageBox.hidden=true; md.hidden=false;
+    }
+    if(this.editingId!==n.id && !this.isImageNode(n)){
+      md.innerHTML=this.md(n.text);
       const memo=el.querySelector('.node-memo');
       if(n.memo){ memo.hidden=false; memo.textContent=n.memo; } else memo.hidden=true;
+    } else if(this.isImageNode(n)){
+      el.querySelector('.node-memo').hidden=true;
     }
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
+    el.style.height=this.isImageNode(n) ? ((n.h||State.MIN_NODE_H)+'px') : '';
     el.style.background=(n.style&&n.style.fill)||'';
     el.style.borderColor=(n.style&&n.style.stroke)||'';
     el.style.color=(n.style&&n.style.text)||'';
     el.classList.toggle('selected', Selection.hasNode(n.id));
     el.classList.toggle('freeform-node', n.kind==='free');
+    el.classList.toggle('image-node', this.isImageNode(n));
     // tree collapse toggle
     const tg=el.querySelector('.collapse-toggle');
     if(n.kind==='tree' && this.hasChildren(n.id)){
@@ -73,14 +87,17 @@ const Nodes = {
   applyPositions(){
     const s=State.activeSheet(); if(!s) return;
     for(const id in this.els){ const n=s.nodes[id]; if(!n) continue;
-      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; this.els[id].style.minHeight=(n.h||0)+'px'; }
+      this.els[id].style.left=n.x+'px'; this.els[id].style.top=n.y+'px'; this.els[id].style.width=n.w+'px'; this.els[id].style.minHeight=(n.h||0)+'px';
+      this.els[id].style.height=this.isImageNode(n) ? ((n.h||State.MIN_NODE_H)+'px') : ''; }
   },
   refreshSelection(){ for(const id in this.els){ this.els[id].classList.toggle('selected', Selection.hasNode(id)); } },
+  isImageNode(n){ return !!(n && n.type==='image' && n.image && n.image.src); },
 
   /* ---------- editing ---------- */
   beginEdit(id, which){
     if(this.editingId) this.commitEdit();
     const n=State.getNode(id); if(!n) return;
+    if(this.isImageNode(n)) return;
     this.editingId=id; this._which=which||'text'; this._editSnap=mcClone(State.project);
     const el=this.els[id]; if(!el) return;
     const cur=this._which==='memo'?(n.memo||''):n.text;
