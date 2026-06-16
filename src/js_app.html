@@ -47,7 +47,7 @@ const App = {
     Edges.renderBranches(sheet);
     Edges.render(sheet); Sections.render(sheet);
     Canvas.apply();
-    this.updateSheetTabs(); this.updateAlignBar(); History.update();
+    this.updateSheetTabs(); this.updateAlignBar(); this.updateStyleBar(); History.update();
   },
 
   /* ---------- tools / toolbar ---------- */
@@ -65,6 +65,17 @@ const App = {
     if(s) s.classList.toggle('active', !!pf.snap);
   },
   updateAlignBar(){ document.getElementById('align-bar').hidden = Selection.nodes.size<2; },
+  updateStyleBar(){
+    const bar=document.getElementById('style-bar'); if(!bar) return;
+    const any=Selection.nodes.size || Selection.sections.size;
+    bar.hidden=!any;
+    if(!any) return;
+    bar.querySelectorAll('input[data-style]').forEach(input=>{
+      const color=Selection.styleValue(input.dataset.style);
+      input.value=color;
+      input.parentNode.style.color=color;
+    });
+  },
   closeMenus(){ const m=document.getElementById('export-menu'); if(m) m.hidden=true; },
 
   /* ---------- images ---------- */
@@ -263,6 +274,9 @@ const App = {
     document.querySelectorAll('#align-bar [data-align]').forEach(b=>b.onclick=()=>{
       const a=b.dataset.align;
       if(a==='group') Selection.group(); else if(a==='ungroup') Selection.ungroup(); else Selection.align(a);
+    });
+    document.querySelectorAll('#style-bar input[data-style]').forEach(input=>{
+      input.addEventListener('change',()=>Selection.applyStyle(input.dataset.style, input.value));
     });
 
     // export menu

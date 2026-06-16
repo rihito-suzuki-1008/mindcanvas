@@ -68,6 +68,9 @@ const Nodes = {
     }
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.minHeight=(n.h||0)+'px';
     el.style.height=this.isImageNode(n) ? ((n.h||State.MIN_NODE_H)+'px') : '';
+    el.style.background=(n.style&&n.style.fill)||'';
+    el.style.borderColor=(n.style&&n.style.stroke)||'';
+    el.style.color=(n.style&&n.style.text)||'';
     el.classList.toggle('selected', Selection.hasNode(n.id));
     el.classList.toggle('freeform-node', n.kind==='free');
     el.classList.toggle('image-node', this.isImageNode(n));

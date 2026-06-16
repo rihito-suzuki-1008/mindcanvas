@@ -42,6 +42,9 @@
     <symbol id="i-align-bottom" viewBox="0 0 24 24"><path d="M4 19h16M7 6v9M12 9v6M17 5v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-distribute-h" viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M8 12h2M14 12h2M11 7h2v10h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-distribute-v" viewBox="0 0 24 24"><path d="M5 4h14M5 20h14M12 8v2M12 14v2M7 11h10v2H7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-border" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/></symbol>
+    <symbol id="i-fill" viewBox="0 0 24 24"><path d="M6 13 13 6l5 5-7 7H6v-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 16c1.5 1.4 2.2 2.5 2.2 3.2a2.2 2.2 0 0 1-4.4 0c0-.7.7-1.8 2.2-3.2Z" fill="currentColor"/></symbol>
+    <symbol id="i-text-color" viewBox="0 0 24 24"><path d="M6 19 12 5l6 14M8.2 14h7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-group" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 10V6a2 2 0 0 1 2-2h4M14 4h4a2 2 0 0 1 2 2v4M20 14v4a2 2 0 0 1-2 2h-4M10 20H6a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
     <symbol id="i-ungroup" viewBox="0 0 24 24"><rect x="8" y="8" width="8" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
   </svg>
@@ -110,6 +113,12 @@
         <span class="align-sep"></span>
         <button data-align="group" title="グループ化 (Ctrl+G)" aria-label="グループ化"><svg class="i" aria-hidden="true"><use href="#i-group"></use></svg></button>
         <button data-align="ungroup" title="グループ解除 (Ctrl+Shift+G)" aria-label="グループ解除"><svg class="i" aria-hidden="true"><use href="#i-ungroup"></use></svg></button>
+      </div>
+
+      <div id="style-bar" class="style-bar" hidden>
+        <label title="枠線の色" aria-label="枠線の色"><svg class="i" aria-hidden="true"><use href="#i-border"></use></svg><input type="color" data-style="stroke"></label>
+        <label title="塗りつぶしの色" aria-label="塗りつぶしの色"><svg class="i" aria-hidden="true"><use href="#i-fill"></use></svg><input type="color" data-style="fill"></label>
+        <label title="文字の色" aria-label="文字の色"><svg class="i" aria-hidden="true"><use href="#i-text-color"></use></svg><input type="color" data-style="text"></label>
       </div>
 
       <div id="stage">
