@@ -80,7 +80,7 @@ clasp deploy --description "MindCanvas v2 (sheet-bound)"
 
 | 区分 | 内容 |
 |---|---|
-| ダイアログ | シート名・接続ラベル・削除確認に `window.prompt/confirm` を使用。GAS サンドボックスでは動作するが、将来はカスタムモーダル化が望ましい。 |
+| ダイアログ | シート名・接続ラベル・削除確認はアプリ内カスタムモーダル（`Dialog`）で表示する。ブラウザ標準の `prompt/confirm/alert` は使わない。 |
 | 永続性 | localStorage は origin 変動で揮発し得るため durable backend（Drive 優先・スプシ フォールバック）が前提（[storage-and-sync](storage-and-sync.md)）。 |
 | Drive 制限環境 | `drive.file` 認可が拒否されると起動不可。`appsscript.json` の `drive.file` 行を削除すれば probe が自動で Sheets 専用に倒す。 |
 | スプシ 1セル制限 | Sheet backend は 1プロジェクト=1セル(json)。~5万文字上限。巨大マップは将来分割が必要。 |
@@ -94,5 +94,5 @@ clasp deploy --description "MindCanvas v2 (sheet-bound)"
 - 画像/添付の挿入
 - テンプレート、アウトライン表示モード
 - レイアウトエンジンの追加（左右バランス型マインドマップ / 組織図型）— `Tree.relayout` を差し替え可能に設計済み
-- カスタムモーダルによる `prompt/confirm` 置換
+- モーダルの共通化（新規プロジェクト / インポート / エクスポートも `Dialog` 系へ寄せる）
 - AI による発散・分類・要約

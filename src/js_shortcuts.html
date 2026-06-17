@@ -35,6 +35,8 @@ const Shortcuts = {
     if(!mod && e.key.toLowerCase()==='v'){ App.setTool('select'); return; }
     if(!mod && e.key.toLowerCase()==='n'){ App.setTool('node'); return; }
     if(!mod && e.key.toLowerCase()==='s'){ App.setTool('section'); return; }
+    if(!mod && e.key.toLowerCase()==='t'){ App.setTool('plainText'); return; }
+    if((e.key==='Enter'||e.key==='F2') && Edges.selectedId){ e.preventDefault(); Edges.editLabel(Edges.selectedId); return; }
 
     const ids=Selection.nodeIds();
     const tree = ids.length===1 && Tree.isTreeNode(State.getNode(ids[0]));

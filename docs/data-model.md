@@ -50,7 +50,7 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
   w: 200,             // 幅（可変）。高さは内容に追従（model に持たない）
   h: 0,               // 予備（実高さは DOM の offsetHeight を使用）
   kind: "tree" | "free",
-  type: "text" | "image", // 省略時は text 扱い
+  type: "text" | "image" | "plainText", // 省略時は text 扱い
   text: "アイデア",    // Markdown 文字列
   memo: "",           // サブメモ（プレーン）
   parentId: null,     // ツリー階層（freeform では常に null）
@@ -67,6 +67,8 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
 
 画像ノードは通常の Node として扱う。`kind` は `free`、`type` は `image`、`text` にはファイル名を入れる。画像本文編集は行わず、移動・リサイズ・選択・削除・接続は通常ノードと同じ。
 
+プレーンテキスト要素も通常の Node として保存する。`kind` は `free`、`type` は `plainText` とし、枠線・塗り・接続ハンドル・メモを表示しない。本文は `text` に保存する。
+
 ```js
 {
   src: "data:image/jpeg;base64,...", // 保存用Data URL
@@ -79,6 +81,7 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
 
 <!-- 2026-06-15: 画像アップロードはDrive追加APIを増やさず、プロジェクトJSON内の画像ノードとして保存する。ラスター画像はクライアント側で長辺1600px以内に縮小する。 -->
 <!-- 2026-06-15 / #18: 色付けは `style.stroke` / `style.fill` / `style.text` として保存する。 -->
+<!-- 2026-06-17 / #23: 枠無しのプレーンテキストは `type: "plainText"` のfreeノードとして保存する。 -->
 
 | transient（保存しない / 実行時のみ） | 意味 |
 |---|---|
@@ -97,12 +100,13 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
   fromSide: "t"|"r"|"b"|"l"|null,  // 始点の接続辺（null=自動）
   toSide:   "t"|"r"|"b"|"l"|null,  // 終点の接続辺（null=自動）
   kind: "straight" | "curve",      // curve=遠距離向けに制御点を大きく
-  label: "",          // 接続ラベル
+  label: "",          // 接続ラベル（改行可）
   directed: true      // 矢印の有無
 }
 ```
 - 同一 `from→to` の重複追加は不可（既存を返す）。`from===to` は不可。
 - `fromSide/toSide` が null の場合、両ノード中心の相対位置から自動決定（`Edges.autoSides`）。
+- `label` は複数行を保持できる。Mermaid export では改行を `<br/>` として出力し、Mermaid import では `<br/>` を改行へ戻す。
 
 ## 3.6 Section
 

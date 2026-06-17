@@ -1,7 +1,7 @@
 <script>
 const NS='http://www.w3.org/2000/svg';
 const Edges = {
-  g:null, branchG:null, paths:{}, branches:{}, labels:{}, selectedId:null,
+  g:null, branchG:null, paths:{}, hitPaths:{}, branches:{}, labels:{}, selectedId:null,
   init(){ this.g=document.getElementById('edges-g'); this.branchG=document.getElementById('branch-g'); },
 
   /* structural parent->child branches (tree mode) */
@@ -43,7 +43,14 @@ const Edges = {
     return { x:u*u*u*p0.x+3*u*u*t*c0.x+3*u*t*t*c1.x+t*t*t*p1.x,
              y:u*u*u*p0.y+3*u*u*t*c0.y+3*u*t*t*c1.y+t*t*t*p1.y }; },
 
-  geom(e){
+  reverseOffset(e,sheet,p0,p1){
+    const hasReverse=Object.values(sheet.edges||{}).some(x=>x.id!==e.id && x.from===e.to && x.to===e.from);
+    if(!hasReverse) return {x:0,y:0};
+    const dx=p1.x-p0.x, dy=p1.y-p0.y, len=Math.hypot(dx,dy)||1, amount=18;
+    return { x:-dy/len*amount, y:dx/len*amount };
+  },
+
+  geom(e,sheet){
     const ra=this.nodeRect(e.from), rb=this.nodeRect(e.to); if(!ra||!rb) return null;
     let fs=e.fromSide, ts=e.toSide;
     if(!fs||!ts){ const auto=this.autoSides(ra,rb); if(!fs) fs=auto[0]; if(!ts) ts=auto[1]; }
@@ -52,8 +59,11 @@ const Edges = {
     const dist=Math.hypot(p1.x-p0.x,p1.y-p0.y);
     const k=e.kind==='curve'?clamp(dist*0.5,80,400):clamp(dist*0.4,30,170);
     const c0={x:p0.x+n0.x*k, y:p0.y+n0.y*k}, c1={x:p1.x+n1.x*k, y:p1.y+n1.y*k};
-    return { d:'M'+p0.x+','+p0.y+' C'+c0.x+','+c0.y+' '+c1.x+','+c1.y+' '+p1.x+','+p1.y,
-             mid:this.bez(p0,c0,c1,p1,0.5) };
+    const off=this.reverseOffset(e,sheet,p0,p1);
+    const q0={x:p0.x+off.x,y:p0.y+off.y}, q1={x:p1.x+off.x,y:p1.y+off.y};
+    const qc0={x:c0.x+off.x,y:c0.y+off.y}, qc1={x:c1.x+off.x,y:c1.y+off.y};
+    return { d:'M'+q0.x+','+q0.y+' C'+qc0.x+','+qc0.y+' '+qc1.x+','+qc1.y+' '+q1.x+','+q1.y,
+             mid:this.bez(q0,qc0,qc1,q1,0.5) };
   },
 
   render(sheet){
@@ -62,7 +72,7 @@ const Edges = {
       const e=sheet.edges[id];
       const fa=sheet.nodes[e.from], fb=sheet.nodes[e.to];
       if(!fa||!fb||fa._hidden||fb._hidden){ this._remove(id); continue; }
-      const g=this.geom(e); if(!g){ this._remove(id); continue; }
+      const g=this.geom(e,sheet); if(!g){ this._remove(id); continue; }
       present[id]=1;
       let p=this.paths[id];
       if(!p){ p=document.createElementNS(NS,'path'); p.setAttribute('class','edge'); p.setAttribute('fill','none');
@@ -71,28 +81,40 @@ const Edges = {
         p.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
         this.g.appendChild(p); this.paths[id]=p; }
       p.setAttribute('d',g.d);
+      let hp=this.hitPaths[id];
+      if(!hp){ hp=document.createElementNS(NS,'path'); hp.setAttribute('class','edge-hit'); hp.setAttribute('fill','none');
+        hp.dataset.id=id;
+        hp.addEventListener('pointerdown',(ev)=>{ ev.stopPropagation(); this.select(id); });
+        hp.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
+        this.g.appendChild(hp); this.hitPaths[id]=hp; }
+      hp.setAttribute('d',g.d);
       const sel=this.selectedId===id;
       p.setAttribute('stroke', sel?'#3b82f6':'#5b6472');
       p.setAttribute('stroke-width', sel?'3':'2');
       p.setAttribute('marker-end', e.directed?'url(#arrow)':'');
       // label
-      if(e.label){ let l=this.labels[id];
+      if(e.label || sel){ let l=this.labels[id];
         if(!l){ l=document.createElement('div'); l.className='edge-label'; l.dataset.id=id;
+          l.addEventListener('pointerdown',(ev)=>{ ev.stopPropagation(); this.select(id); });
           l.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
           Nodes.layer.appendChild(l); this.labels[id]=l; }
-        l.textContent=e.label; l.style.left=g.mid.x+'px'; l.style.top=g.mid.y+'px';
+        l.textContent=e.label || 'ラベル';
+        l.classList.toggle('placeholder', !e.label);
+        l.style.left=g.mid.x+'px'; l.style.top=g.mid.y+'px';
       } else if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; }
     }
     for(const id in this.paths){ if(!present[id]) this._remove(id); }
   },
   _remove(id){ if(this.paths[id]){ this.paths[id].remove(); delete this.paths[id]; }
+    if(this.hitPaths[id]){ this.hitPaths[id].remove(); delete this.hitPaths[id]; }
     if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; } },
 
-  select(id){ this.selectedId=id; if(typeof Selection!=='undefined') Selection.clear(); this.render(State.activeSheet()); Nodes.refreshSelection(); App.updateAlignBar(); },
+  select(id){ this.selectedId=id; if(typeof Selection!=='undefined') Selection.clear(); this.render(State.activeSheet()); Nodes.refreshSelection(); App.updateAlignBar(); App.updateStyleBar(); },
   deselect(){ if(this.selectedId){ this.selectedId=null; this.render(State.activeSheet()); } },
-  editLabel(id){
+  async editLabel(id){
     const e=State.activeSheet().edges[id]; if(!e) return;
-    const v=window.prompt('接続ラベル', e.label||''); if(v===null) return;
+    const v=await Dialog.prompt('接続ラベル', e.label||'', {multiline:true, okText:'保存'});
+    if(v===null) return;
     const snap=mcClone(State.project); e.label=v; History.pushSnapshot(snap); State.touchRender();
   },
   deleteSelected(){

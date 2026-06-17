@@ -47,7 +47,7 @@ const Importer = {
 
   parseMermaid(text){
     const nodes={}, edges=[], sections=[], warnings=[];
-    let currentSection=null;
+    let currentSection=null, direction='LR';
     const ensureNode=(id,label)=>{
       if(!id) return null;
       if(!nodes[id]) nodes[id]={ id:id, label:label||this.cleanId(id), sectionId:null };
@@ -59,6 +59,8 @@ const Importer = {
       let line=raw.trim();
       if(!line || line.indexOf('%%')===0) return;
       line=line.replace(/;$/,'').trim();
+      const head=line.match(/^(flowchart|graph)\s+(TB|TD|BT|RL|LR)\b/i);
+      if(head){ direction=head[2].toUpperCase()==='TD'?'TB':head[2].toUpperCase(); return; }
       if(/^(flowchart|graph)\b/i.test(line)) return;
       if(/^classDef\b|^class\b|^style\b|^linkStyle\b/i.test(line)) return;
       if(/^end$/i.test(line)){ currentSection=null; return; }
@@ -68,29 +70,40 @@ const Importer = {
         const sec={ id:expr.id||uid('sec'), label:expr.label||this.cleanId(expr.id)||'セクション' };
         sections.push(sec); currentSection=sec; return;
       }
-      const edge=this.parseEdge(line);
-      if(edge){
-        ensureNode(edge.from.id, edge.from.label);
-        ensureNode(edge.to.id, edge.to.label);
-        edges.push({ from:edge.from.id, to:edge.to.id, label:edge.label||'' });
+      const foundEdges=this.parseEdges(line);
+      if(foundEdges.length){
+        foundEdges.forEach(edge=>{
+          ensureNode(edge.from.id, edge.from.label);
+          ensureNode(edge.to.id, edge.to.label);
+          edges.push({ from:edge.from.id, to:edge.to.id, label:edge.label||'' });
+        });
         return;
       }
       const node=this.parseNodeExpr(line);
       if(node.id && node.label){ ensureNode(node.id,node.label); return; }
       warnings.push({line:idx+1, text:raw});
     });
-    return { nodes:Object.values(nodes), edges:edges, sections:sections, warnings:warnings };
+    return { nodes:Object.values(nodes), edges:edges, sections:sections, warnings:warnings, direction:direction };
   },
 
-  parseEdge(line){
-    let m=line.match(/^(.+?)\s*[-.=]+>\s*(?:\|([^|]*)\|\s*)?(.+)$/);
-    if(!m) m=line.match(/^(.+?)\s*--\s*(.*?)\s*-->\s*(.+)$/);
-    if(!m) return null;
-    return {
-      from:this.parseNodeExpr(m[1]),
-      label:(m[2]||'').trim(),
-      to:this.parseNodeExpr(m[3])
-    };
+  parseEdges(line){
+    const arrow=/\s*(?:[-.=]+>\s*(?:\|([^|]*)\|\s*)?|--\s*(.*?)\s*-->\s*)/g;
+    const parts=[], labels=[];
+    let pos=0, m;
+    while((m=arrow.exec(line))){
+      parts.push(line.slice(pos,m.index).trim());
+      labels.push((m[1]||m[2]||'').trim());
+      pos=arrow.lastIndex;
+    }
+    if(!labels.length) return [];
+    parts.push(line.slice(pos).trim());
+    const out=[];
+    for(let i=0;i<labels.length;i++){
+      const from=this.parseNodeExpr(parts[i]), to=this.parseNodeExpr(parts[i+1]);
+      if(!from.id||!to.id) return [];
+      out.push({ from:from, to:to, label:labels[i]||'' });
+    }
+    return out;
   },
 
   parseNodeExpr(expr){
@@ -117,16 +130,16 @@ const Importer = {
 
   buildSheet(parsed){
     const sheet={ id:uid('sh'), name:'Mermaid import '+(State.project.sheets.length+1), nodes:{}, edges:{}, sections:{}, viewport:{x:120,y:90,zoom:1} };
-    const levels=this.levels(parsed.nodes, parsed.edges), byOld={};
+    const layout=this.layout(parsed), byOld={};
     parsed.nodes.forEach((n,i)=>{
-      const level=levels[n.id]||0;
-      const row=parsed.nodes.filter(x=>(levels[x.id]||0)===level).findIndex(x=>x.id===n.id);
-      const nn=State.mkNode({ kind:'free', parentId:null, text:n.label||this.cleanId(n.id), x:80+level*280, y:100+row*140, w:State.FREE_NODE_W, h:State.FREE_NODE_H });
+      const pos=layout.positions[n.id]||{x:80+i*240,y:100};
+      const nn=State.mkNode({ kind:'free', parentId:null, text:n.label||this.cleanId(n.id), x:Canvas.snap(pos.x), y:Canvas.snap(pos.y), w:State.FREE_NODE_W, h:State.FREE_NODE_H });
       sheet.nodes[nn.id]=nn; byOld[n.id]=nn.id;
     });
     parsed.edges.forEach(e=>{
       if(!byOld[e.from]||!byOld[e.to]) return;
-      const ne={ id:uid('e'), from:byOld[e.from], to:byOld[e.to], fromSide:null, toSide:null, kind:'straight', label:e.label||'', directed:true };
+      const sides=this.edgeSides(layout.positions[e.from], layout.positions[e.to]);
+      const ne={ id:uid('e'), from:byOld[e.from], to:byOld[e.to], fromSide:sides[0], toSide:sides[1], kind:'straight', label:e.label||'', directed:true };
       sheet.edges[ne.id]=ne;
     });
     parsed.sections.forEach(sec=>{
@@ -138,6 +151,40 @@ const Importer = {
       sheet.sections[s.id]=s;
     });
     return sheet;
+  },
+
+  layout(parsed){
+    const nodes=parsed.nodes||[], edges=parsed.edges||[], order={};
+    nodes.forEach((n,i)=>order[n.id]=i);
+    const comps=this.components(nodes,edges,order), positions={};
+    let stackY=100;
+    comps.forEach(comp=>{
+      const ranks=this.ranks(comp,edges,order);
+      const rankList=this.orderRanks(comp,edges,ranks,order);
+      const local=this.placeRanks(rankList,parsed.direction||'LR',edges,ranks);
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      comp.forEach(id=>{ const p=local[id]; minX=Math.min(minX,p.x); minY=Math.min(minY,p.y); maxX=Math.max(maxX,p.x); maxY=Math.max(maxY,p.y); });
+      const offX=80-minX, offY=stackY-minY;
+      comp.forEach(id=>{ positions[id]={ x:local[id].x+offX, y:local[id].y+offY }; });
+      stackY += (maxY-minY) + State.FREE_NODE_H + 180;
+    });
+    return {positions:positions};
+  },
+
+  components(nodes,edges,order){
+    const ids=nodes.map(n=>n.id), adj={};
+    ids.forEach(id=>adj[id]=[]);
+    edges.forEach(e=>{ if(adj[e.from]&&adj[e.to]){ adj[e.from].push(e.to); adj[e.to].push(e.from); } });
+    const seen={}, comps=[];
+    ids.sort((a,b)=>order[a]-order[b]).forEach(id=>{
+      if(seen[id]) return;
+      const q=[id], comp=[]; seen[id]=1;
+      while(q.length){ const cur=q.shift(); comp.push(cur);
+        adj[cur].forEach(n=>{ if(!seen[n]){ seen[n]=1; q.push(n); } });
+      }
+      comps.push(comp.sort((a,b)=>order[a]-order[b]));
+    });
+    return comps;
   },
 
   levels(nodes, edges){
@@ -152,6 +199,114 @@ const Importer = {
     }
     ids.forEach(id=>{ if(level[id]==null) level[id]=0; });
     return level;
+  },
+
+  ranks(ids,edges,order){
+    const set=new Set(ids), preds={}, memo={}, visiting={};
+    ids.forEach(id=>preds[id]=[]);
+    edges.forEach(e=>{ if(set.has(e.from)&&set.has(e.to)) preds[e.to].push(e.from); });
+    const rankOf=(id)=>{
+      if(memo[id]!=null) return memo[id];
+      if(visiting[id]) return 0;
+      visiting[id]=1;
+      let r=0;
+      preds[id].sort((a,b)=>order[a]-order[b]).forEach(p=>{ r=Math.max(r,rankOf(p)+1); });
+      visiting[id]=0; memo[id]=r; return r;
+    };
+    ids.forEach(rankOf);
+    const min=Math.min(...ids.map(id=>memo[id]||0));
+    ids.forEach(id=>memo[id]=(memo[id]||0)-min);
+    return memo;
+  },
+
+  orderRanks(ids,edges,ranks,order){
+    const byRank={};
+    ids.forEach(id=>{ const r=ranks[id]||0; (byRank[r]||(byRank[r]=[])).push(id); });
+    Object.keys(byRank).forEach(r=>byRank[r].sort((a,b)=>order[a]-order[b]));
+    const max=Math.max(...Object.keys(byRank).map(Number));
+    const neighbors=(id,targetRank)=>{
+      const out=[];
+      edges.forEach(e=>{
+        if(e.from===id && ranks[e.to]===targetRank) out.push(e.to);
+        if(e.to===id && ranks[e.from]===targetRank) out.push(e.from);
+      });
+      return out;
+    };
+    const posOf=(arr)=>{ const p={}; arr.forEach((id,i)=>p[id]=i); return p; };
+    for(let pass=0;pass<4;pass++){
+      for(let r=1;r<=max;r++) this.sortRank(byRank,r,neighbors,posOf,r-1,order);
+      for(let r=max-1;r>=0;r--) this.sortRank(byRank,r,neighbors,posOf,r+1,order);
+    }
+    return byRank;
+  },
+
+  sortRank(byRank,r,neighbors,posOf,targetRank,order){
+    const arr=byRank[r]; if(!arr||!byRank[targetRank]) return;
+    const targetPos=posOf(byRank[targetRank]);
+    arr.sort((a,b)=>{
+      const ba=this.barycenter(neighbors(a,targetRank),targetPos);
+      const bb=this.barycenter(neighbors(b,targetRank),targetPos);
+      if(ba!==bb) return ba-bb;
+      return order[a]-order[b];
+    });
+  },
+
+  barycenter(ids,pos){
+    if(!ids.length) return Infinity;
+    return ids.reduce((sum,id)=>sum+(pos[id]||0),0)/ids.length;
+  },
+
+  placeRanks(byRank,direction,edges,ranksById){
+    const rankSep=300, rowSep=180, pos={}, coords=this.rowCoords(byRank,edges,ranksById);
+    const ranks=Object.keys(byRank).map(Number).sort((a,b)=>a-b), maxRank=Math.max(...ranks);
+    ranks.forEach(r=>{
+      byRank[r].forEach((id,row)=>{
+        const coord=coords[id]!=null?coords[id]:row;
+        let x=r*rankSep, y=coord*rowSep;
+        if(direction==='RL') x=(maxRank-r)*rankSep;
+        else if(direction==='TB'){ x=coord*260; y=r*rowSep; }
+        else if(direction==='BT'){ x=coord*260; y=(maxRank-r)*rowSep; }
+        pos[id]={x:x,y:y};
+      });
+    });
+    return pos;
+  },
+
+  rowCoords(byRank,edges,ranksById){
+    const coords={}, ranks=Object.keys(byRank).map(Number).sort((a,b)=>a-b), maxRank=Math.max(...ranks);
+    ranks.forEach(r=>byRank[r].forEach((id,i)=>coords[id]=i));
+    const neighbors=(id,targetRank)=>{
+      const out=[];
+      edges.forEach(e=>{
+        if(e.from===id && ranksById[e.to]===targetRank) out.push(e.to);
+        if(e.to===id && ranksById[e.from]===targetRank) out.push(e.from);
+      });
+      return out;
+    };
+    const relax=(r,targetRank)=>{
+      const arr=byRank[r]; if(!arr||!byRank[targetRank]) return;
+      const desired={};
+      arr.forEach(id=>{
+        const ns=neighbors(id,targetRank);
+        desired[id]=ns.length ? ns.reduce((sum,n)=>sum+(coords[n]||0),0)/ns.length : coords[id];
+      });
+      const sorted=arr.slice().sort((a,b)=>desired[a]-desired[b] || coords[a]-coords[b]);
+      let prev=-Infinity;
+      sorted.forEach(id=>{
+        let v=desired[id];
+        if(prev!==-Infinity) v=Math.max(v,prev+1);
+        coords[id]=v; prev=v;
+      });
+    };
+    for(let r=1;r<=maxRank;r++) relax(r,r-1);
+    return coords;
+  },
+
+  edgeSides(a,b){
+    if(!a||!b) return [null,null];
+    const dx=b.x-a.x, dy=b.y-a.y;
+    if(Math.abs(dx)>=Math.abs(dy)) return dx>=0?['r','l']:['l','r'];
+    return dy>=0?['b','t']:['t','b'];
   }
 };
 </script>

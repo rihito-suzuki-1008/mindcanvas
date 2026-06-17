@@ -70,9 +70,9 @@ const Sections = {
         History.pushSnapshot(snap); State.touchRender(); } };
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
   },
-  editTitle(id){
+  async editTitle(id){
     const sec=State.activeSheet().sections[id]; if(!sec) return;
-    const v=window.prompt('セクション名', sec.title||''); if(v===null) return;
+    const v=await Dialog.prompt('セクション名', sec.title||''); if(v===null) return;
     const snap=mcClone(State.project); sec.title=v; History.pushSnapshot(snap); State.touchRender();
   },
 

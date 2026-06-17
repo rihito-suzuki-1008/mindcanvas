@@ -66,6 +66,7 @@
 |---|---|
 | `els` / `editingId` | DOM 要素マップ / 編集中 ID |
 | `md(text)` | Markdown→サニタイズ済 HTML |
+| `isImageNode(n)` / `isPlainTextNode(n)` | 特殊ノード種別判定 |
 | `render(sheet)` / `renderOne(n)` / `applyPositions()` / `refreshSelection()` | 描画 |
 | `beginEdit(id,which)` / `commitEdit()` | 編集（which: 'text' | 'memo'） |
 | `createAt(wx,wy,opts)` | 生成して即編集 |
@@ -75,9 +76,9 @@
 | メンバー | 説明 |
 |---|---|
 | `renderBranches(sheet)` / `clearBranches()` | ツリー親子の枝（branch-g） |
-| `render(sheet)` | エッジ（edges-g）+ ラベル |
+| `render(sheet)` | エッジ（edges-g）+ 選択用ヒットパス + ラベル |
 | `nodeRect(id)` / `anchor(r,side)` / `geom(e)` | 幾何計算（三次ベジェ） |
-| `select(id)` / `deselect()` / `editLabel(id)` / `deleteSelected()` | 選択/ラベル/削除 |
+| `select(id)` / `deselect()` / `editLabel(id)` / `deleteSelected()` | 選択/複数行ラベル編集/削除 |
 | `startLink(e,fromId,side)` | ハンドルからの接続作成 |
 
 ## Tree（js_tree）— ツリーレイアウト
@@ -118,10 +119,13 @@
 `run(kind)`（'png'|'pdf'|'md'|'mermaid'）/ `capture()`（fit→html-to-image→復元）/ `png()` / `pdf()` / `markdown()` / `mermaid()` / `showText(title,text,ext)`
 
 ## Importer（js_import）
-`init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `buildSheet(parsed)` / `levels(nodes,edges)`
+`init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `parseEdges(line)` / `buildSheet(parsed)` / `layout(parsed)` / `components(nodes,edges,order)` / `ranks(ids,edges,order)` / `orderRanks(ids,edges,ranks,order)` / `placeRanks(byRank,direction,edges,ranksById)` / `rowCoords(byRank,edges,ranksById)` / `edgeSides(a,b)` / `levels(nodes,edges)`。`levels` は旧配置ロジック互換用。
+
+## Dialog（js_dialog）
+`open(opts)` / `prompt(title,value,opts)` / `confirm(title,message,opts)`。単一行入力、複数行入力（`opts.multiline`）、確認ダイアログをアプリ内モーダルで表示する。`Escape` でキャンセル、単一行は `Enter`、複数行は `Ctrl/⌘ + Enter` で確定。
 
 ## Shortcuts（js_shortcuts）
-`init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`
+`init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`。`T` はプレーンテキスト、エッジ選択中の `Enter` / `F2` はラベル編集。
 
 ## Home（js_home）
 `show()` / `render()` / `duplicate(id)` / `remove(id,name)` / `newModal()` / `create(name,mode)`

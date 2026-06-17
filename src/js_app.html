@@ -53,7 +53,7 @@ const App = {
   /* ---------- tools / toolbar ---------- */
   setTool(t){
     this.tool=t;
-    const st=Canvas.stage; st.classList.toggle('tool-node',t==='node'); st.classList.toggle('tool-section',t==='section');
+    const st=Canvas.stage; st.classList.toggle('tool-node',t==='node'||t==='plainText'); st.classList.toggle('tool-section',t==='section');
     this.updateToolbar();
   },
   updateToolbar(){
@@ -155,8 +155,11 @@ const App = {
       const t=document.createElement('button'); t.className='sheet-tab'+(sh.id===State.project.activeSheetId?' active':'');
       t.innerHTML='<span class="nm">'+escAttr(sh.name)+'</span>'+(State.project.sheets.length>1?'<span class="x">'+iconSvg('x','tiny')+'</span>':'');
       t.querySelector('.nm').onclick=()=>State.setActiveSheet(sh.id);
-      t.querySelector('.nm').ondblclick=()=>{ const v=prompt('シート名',sh.name); if(v!=null) State.renameSheet(sh.id,v.trim()||sh.name); };
-      const x=t.querySelector('.x'); if(x) x.onclick=(e)=>{ e.stopPropagation(); if(confirm('シート「'+sh.name+'」を削除しますか？')) State.removeSheet(sh.id); };
+      t.querySelector('.nm').ondblclick=async()=>{ const v=await Dialog.prompt('シート名',sh.name); if(v!=null) State.renameSheet(sh.id,v.trim()||sh.name); };
+      const x=t.querySelector('.x'); if(x) x.onclick=async(e)=>{ e.stopPropagation();
+        const ok=await Dialog.confirm('シートを削除', 'シート「'+sh.name+'」を削除します。', {danger:true, okText:'削除'});
+        if(ok) State.removeSheet(sh.id);
+      };
       wrap.appendChild(t);
     });
   },
@@ -301,6 +304,7 @@ const App = {
     if(this.spaceDown || e.button===1){ Canvas.startPan(e); return; }
     if(e.button!==0) return;
     if(this.tool==='node'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y); return; }
+    if(this.tool==='plainText'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y,{kind:'free', type:'plainText', w:220, h:0, text:''}); return; }
     if(this.tool==='section'){ Sections.startDraw(e); return; }
     Edges.deselect(); Selection.startMarquee(e);
   }
