@@ -74,6 +74,7 @@ const Nodes = {
     el.classList.toggle('selected', Selection.hasNode(n.id));
     el.classList.toggle('freeform-node', n.kind==='free');
     el.classList.toggle('image-node', this.isImageNode(n));
+    el.classList.toggle('plain-text-node', this.isPlainTextNode(n));
     // tree collapse toggle
     const tg=el.querySelector('.collapse-toggle');
     if(n.kind==='tree' && this.hasChildren(n.id)){
@@ -92,6 +93,7 @@ const Nodes = {
   },
   refreshSelection(){ for(const id in this.els){ this.els[id].classList.toggle('selected', Selection.hasNode(id)); } },
   isImageNode(n){ return !!(n && n.type==='image' && n.image && n.image.src); },
+  isPlainTextNode(n){ return !!(n && n.type==='plainText'); },
 
   /* ---------- editing ---------- */
   beginEdit(id, which){

@@ -66,6 +66,7 @@
 |---|---|
 | `els` / `editingId` | DOM 要素マップ / 編集中 ID |
 | `md(text)` | Markdown→サニタイズ済 HTML |
+| `isImageNode(n)` / `isPlainTextNode(n)` | 特殊ノード種別判定 |
 | `render(sheet)` / `renderOne(n)` / `applyPositions()` / `refreshSelection()` | 描画 |
 | `beginEdit(id,which)` / `commitEdit()` | 編集（which: 'text' | 'memo'） |
 | `createAt(wx,wy,opts)` | 生成して即編集 |
@@ -121,7 +122,7 @@
 `init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `buildSheet(parsed)` / `levels(nodes,edges)`
 
 ## Shortcuts（js_shortcuts）
-`init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`
+`init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`。`T` はプレーンテキスト、エッジ選択中の `Enter` / `F2` はラベル編集。
 
 ## Home（js_home）
 `show()` / `render()` / `duplicate(id)` / `remove(id,name)` / `newModal()` / `create(name,mode)`

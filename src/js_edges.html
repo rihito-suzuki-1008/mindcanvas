@@ -76,11 +76,14 @@ const Edges = {
       p.setAttribute('stroke-width', sel?'3':'2');
       p.setAttribute('marker-end', e.directed?'url(#arrow)':'');
       // label
-      if(e.label){ let l=this.labels[id];
+      if(e.label || sel){ let l=this.labels[id];
         if(!l){ l=document.createElement('div'); l.className='edge-label'; l.dataset.id=id;
+          l.addEventListener('pointerdown',(ev)=>{ ev.stopPropagation(); this.select(id); });
           l.addEventListener('dblclick',(ev)=>{ ev.stopPropagation(); this.editLabel(id); });
           Nodes.layer.appendChild(l); this.labels[id]=l; }
-        l.textContent=e.label; l.style.left=g.mid.x+'px'; l.style.top=g.mid.y+'px';
+        l.textContent=e.label || 'ラベル';
+        l.classList.toggle('placeholder', !e.label);
+        l.style.left=g.mid.x+'px'; l.style.top=g.mid.y+'px';
       } else if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; }
     }
     for(const id in this.paths){ if(!present[id]) this._remove(id); }
@@ -88,7 +91,7 @@ const Edges = {
   _remove(id){ if(this.paths[id]){ this.paths[id].remove(); delete this.paths[id]; }
     if(this.labels[id]){ this.labels[id].remove(); delete this.labels[id]; } },
 
-  select(id){ this.selectedId=id; if(typeof Selection!=='undefined') Selection.clear(); this.render(State.activeSheet()); Nodes.refreshSelection(); App.updateAlignBar(); },
+  select(id){ this.selectedId=id; if(typeof Selection!=='undefined') Selection.clear(); this.render(State.activeSheet()); Nodes.refreshSelection(); App.updateAlignBar(); App.updateStyleBar(); },
   deselect(){ if(this.selectedId){ this.selectedId=null; this.render(State.activeSheet()); } },
   editLabel(id){
     const e=State.activeSheet().edges[id]; if(!e) return;

@@ -53,7 +53,7 @@ const App = {
   /* ---------- tools / toolbar ---------- */
   setTool(t){
     this.tool=t;
-    const st=Canvas.stage; st.classList.toggle('tool-node',t==='node'); st.classList.toggle('tool-section',t==='section');
+    const st=Canvas.stage; st.classList.toggle('tool-node',t==='node'||t==='plainText'); st.classList.toggle('tool-section',t==='section');
     this.updateToolbar();
   },
   updateToolbar(){
@@ -301,6 +301,7 @@ const App = {
     if(this.spaceDown || e.button===1){ Canvas.startPan(e); return; }
     if(e.button!==0) return;
     if(this.tool==='node'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y); return; }
+    if(this.tool==='plainText'){ const w=Canvas.screenToWorld(e.clientX,e.clientY); this.setTool('select'); Nodes.createAt(w.x,w.y,{kind:'free', type:'plainText', w:220, h:0, text:''}); return; }
     if(this.tool==='section'){ Sections.startDraw(e); return; }
     Edges.deselect(); Selection.startMarquee(e);
   }

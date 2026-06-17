@@ -164,6 +164,9 @@ button:disabled{cursor:not-allowed}
   border-radius:14px; box-shadow:0 1px 2px rgba(20,24,33,.06),0 5px 18px rgba(20,24,33,.05); padding:10px 12px;
   font-size:14px; line-height:1.45; min-height:40px; user-select:none; overflow:hidden}
 .node.image-node{padding:0; background:#fff; min-height:80px}
+.node.plain-text-node{padding:2px 4px; background:transparent !important; border-color:transparent !important;
+  box-shadow:none; border-style:dashed; font-size:16px; line-height:1.5; min-height:24px; overflow:visible}
+.node.plain-text-node.selected{border-color:rgba(52,120,246,.45) !important; box-shadow:none}
 .node.selected{border-color:var(--node-sel); box-shadow:0 0 0 2px rgba(59,130,246,.25)}
 .node.search-hit{box-shadow:0 0 0 2px #f5b301}
 .node.search-active{box-shadow:0 0 0 3px #f59e0b}
@@ -188,6 +191,9 @@ button:disabled{cursor:not-allowed}
   background:transparent; line-height:1.45; overflow:hidden}
 .node-editor.memo{margin-top:6px; padding-top:6px; border-top:1px dashed var(--line2);
   font-size:11.5px; color:var(--muted)}
+.plain-text-node .node-editor{padding:0; min-height:24px}
+.plain-text-node .node-memo,.plain-text-node .handle,.plain-text-node .grip,
+.plain-text-node .resize-handle,.plain-text-node .collapse-toggle{display:none !important}
 
 /* connection handles */
 .node .handle{position:absolute; width:11px; height:11px; background:#fff; border:2px solid var(--accent);
@@ -225,6 +231,7 @@ button:disabled{cursor:not-allowed}
 /* edge label */
 .edge-label{position:absolute; transform:translate(-50%,-50%); background:#fff; border:1px solid var(--line2);
   border-radius:6px; padding:1px 6px; font-size:11px; color:var(--muted); z-index:3; white-space:nowrap}
+.edge-label.placeholder{color:#8a97aa; border-style:dashed; opacity:.78}
 
 /* ---------- sections ---------- */
 .section{position:absolute; background:var(--section); border:1.5px dashed var(--section-line);
