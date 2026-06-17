@@ -32,6 +32,8 @@ button:disabled{cursor:not-allowed}
 .btn:active{transform:translateY(0) scale(.99); box-shadow:none}
 .btn-primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
 .btn-primary:hover{background:#2f70e8; border-color:#2f70e8; filter:none}
+.btn-danger{background:var(--danger); border-color:var(--danger); color:#fff}
+.btn-danger:hover{background:#c92f36; border-color:#c92f36}
 .icon-btn{border:none; background:transparent; font-size:16px; width:34px; height:34px;
   border-radius:10px; color:var(--muted); display:inline-flex; align-items:center; justify-content:center;
   transition:transform .14s ease, background .14s ease, box-shadow .14s ease, color .14s ease}
@@ -154,6 +156,7 @@ button:disabled{cursor:not-allowed}
 #nodes-layer,#sections-layer{position:absolute; left:0; top:0}
 #edges-svg{position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; z-index:1; pointer-events:none}
 #edges-g path.edge{pointer-events:stroke; cursor:pointer}
+#edges-g path.edge-hit{pointer-events:stroke; cursor:pointer; stroke:transparent; stroke-width:14}
 #nodes-layer{z-index:2}
 #overlay{position:absolute; inset:0; z-index:10; pointer-events:none}
 .marquee{position:absolute; border:1px solid var(--accent); background:rgba(59,130,246,.10); z-index:11}
@@ -230,7 +233,8 @@ button:disabled{cursor:not-allowed}
 
 /* edge label */
 .edge-label{position:absolute; transform:translate(-50%,-50%); background:#fff; border:1px solid var(--line2);
-  border-radius:6px; padding:1px 6px; font-size:11px; color:var(--muted); z-index:3; white-space:nowrap}
+  border-radius:6px; padding:3px 7px; font-size:11px; line-height:1.35; color:var(--muted); z-index:3;
+  white-space:pre-wrap; max-width:180px; text-align:center}
 .edge-label.placeholder{color:#8a97aa; border-style:dashed; opacity:.78}
 
 /* ---------- sections ---------- */
@@ -277,6 +281,11 @@ button:disabled{cursor:not-allowed}
 .modal input.txt{width:100%; padding:10px 12px; border:1px solid var(--line2); border-radius:9px;
   font-size:14px; margin-bottom:18px}
 .modal input.txt:focus{outline:none; border-color:var(--accent)}
+.dialog-modal{width:460px}
+.dialog-textarea{width:100%; min-height:150px; resize:vertical; border:1px solid var(--line2); border-radius:10px;
+  padding:10px 12px; font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink);
+  background:#fbfcfe; margin-bottom:18px}
+.dialog-textarea:focus{outline:none; border-color:var(--accent); background:#fff}
 .import-text{width:100%; min-height:260px; resize:vertical; border:1px solid var(--line2);
   border-radius:10px; padding:10px 12px; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
   color:var(--ink); background:#fbfcfe; margin:8px 0 16px}

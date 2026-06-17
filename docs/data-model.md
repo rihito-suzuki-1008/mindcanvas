@@ -100,12 +100,13 @@ Project 1 ─── * Sheet 1 ─┬─ * Node
   fromSide: "t"|"r"|"b"|"l"|null,  // 始点の接続辺（null=自動）
   toSide:   "t"|"r"|"b"|"l"|null,  // 終点の接続辺（null=自動）
   kind: "straight" | "curve",      // curve=遠距離向けに制御点を大きく
-  label: "",          // 接続ラベル
+  label: "",          // 接続ラベル（改行可）
   directed: true      // 矢印の有無
 }
 ```
 - 同一 `from→to` の重複追加は不可（既存を返す）。`from===to` は不可。
 - `fromSide/toSide` が null の場合、両ノード中心の相対位置から自動決定（`Edges.autoSides`）。
+- `label` は複数行を保持できる。Mermaid export では改行を `<br/>` として出力し、Mermaid import では `<br/>` を改行へ戻す。
 
 ## 3.6 Section
 

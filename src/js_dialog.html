@@ -1,0 +1,47 @@
+<script>
+const Dialog = {
+  open(opts){
+    opts=opts||{};
+    return new Promise((resolve)=>{
+      const root=document.getElementById('modal-root');
+      const mask=document.createElement('div'); mask.className='modal-mask';
+      const multiline=!!opts.multiline;
+      const danger=!!opts.danger;
+      const hasInput=opts.input!==false;
+      mask.innerHTML='<div class="modal dialog-modal">'+
+        '<h2>'+escAttr(opts.title||'確認')+'</h2>'+
+        (opts.message?'<p class="sub">'+escAttr(opts.message)+'</p>':'')+
+        (hasInput?(multiline?
+          '<textarea class="dialog-input dialog-textarea" spellcheck="false"></textarea>':
+          '<input class="txt dialog-input" />'):'')+
+        '<div class="modal-actions">'+
+          '<button class="btn" data-x="cancel">'+escAttr(opts.cancelText||'キャンセル')+'</button>'+
+          '<button class="btn '+(danger?'btn-danger':'btn-primary')+'" data-x="ok">'+escAttr(opts.okText||'OK')+'</button>'+
+        '</div>'+
+      '</div>';
+      root.appendChild(mask);
+      const input=mask.querySelector('.dialog-input');
+      const ok=mask.querySelector('[data-x="ok"]');
+      const done=(val)=>{ mask.remove(); resolve(val); };
+      if(input){ input.value=opts.value||''; setTimeout(()=>{ input.focus(); if(!multiline) input.select(); },0); }
+      else setTimeout(()=>ok.focus(),0);
+      mask.querySelector('[data-x="cancel"]').onclick=()=>done(null);
+      ok.onclick=()=>done(hasInput?input.value:true);
+      mask.addEventListener('click',(e)=>{ if(e.target===mask) done(null); });
+      mask.addEventListener('keydown',(e)=>{
+        if(e.key==='Escape'){ e.preventDefault(); done(null); }
+        if(!multiline && e.key==='Enter'){ e.preventDefault(); done(hasInput?input.value:true); }
+        if(multiline && (e.metaKey||e.ctrlKey) && e.key==='Enter'){ e.preventDefault(); done(input.value); }
+      });
+    });
+  },
+  prompt(title,value,opts){
+    opts=Object.assign({},opts||{}, {title:title, value:value||'', input:true});
+    return this.open(opts);
+  },
+  confirm(title,message,opts){
+    opts=Object.assign({},opts||{}, {title:title, message:message, input:false, okText:(opts&&opts.okText)||'実行'});
+    return this.open(opts);
+  }
+};
+</script>

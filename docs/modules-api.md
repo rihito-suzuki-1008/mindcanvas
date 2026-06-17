@@ -76,9 +76,9 @@
 | メンバー | 説明 |
 |---|---|
 | `renderBranches(sheet)` / `clearBranches()` | ツリー親子の枝（branch-g） |
-| `render(sheet)` | エッジ（edges-g）+ ラベル |
+| `render(sheet)` | エッジ（edges-g）+ 選択用ヒットパス + ラベル |
 | `nodeRect(id)` / `anchor(r,side)` / `geom(e)` | 幾何計算（三次ベジェ） |
-| `select(id)` / `deselect()` / `editLabel(id)` / `deleteSelected()` | 選択/ラベル/削除 |
+| `select(id)` / `deselect()` / `editLabel(id)` / `deleteSelected()` | 選択/複数行ラベル編集/削除 |
 | `startLink(e,fromId,side)` | ハンドルからの接続作成 |
 
 ## Tree（js_tree）— ツリーレイアウト
@@ -120,6 +120,9 @@
 
 ## Importer（js_import）
 `init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `buildSheet(parsed)` / `levels(nodes,edges)`
+
+## Dialog（js_dialog）
+`open(opts)` / `prompt(title,value,opts)` / `confirm(title,message,opts)`。単一行入力、複数行入力（`opts.multiline`）、確認ダイアログをアプリ内モーダルで表示する。`Escape` でキャンセル、単一行は `Enter`、複数行は `Ctrl/⌘ + Enter` で確定。
 
 ## Shortcuts（js_shortcuts）
 `init()` / `editing()` / `onKey(e)` / `onPaste(e)` / `nudge(dx,dy)`。`T` はプレーンテキスト、エッジ選択中の `Enter` / `F2` はラベル編集。

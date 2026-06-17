@@ -6,6 +6,8 @@ const Exporter = {
     t=t.replace(/^#{1,6}\s*/,'').replace(/^[-*+]\s+/,'').replace(/\*\*/g,'').replace(/`/g,'').trim();
     return t||'(空)'; },
   sectionLabel(sec){ return (sec.title||'セクション').replace(/"/g,"'").replace(/[\[\]]/g,'').trim()||'セクション'; },
+  edgeLabelMd(label){ return String(label||'').split(/\r?\n/); },
+  edgeLabelMermaid(label){ return String(label||'').replace(/\r?\n/g,'<br/>').replace(/\|/g,'/').replace(/"/g,"'"); },
   childrenIn(sheet,id){ const out=[]; for(const k in sheet.nodes){ const c=sheet.nodes[k]; if(c.kind==='tree'&&c.parentId===id) out.push(c); } out.sort((a,b)=>a.y-b.y); return out; },
   rootsIn(sheet){ const out=[]; for(const id in sheet.nodes){ const n=sheet.nodes[id];
     if(n.kind==='tree' && (!n.parentId || !sheet.nodes[n.parentId] || sheet.nodes[n.parentId].kind!=='tree')) out.push(n); } out.sort((a,b)=>a.y-b.y); return out; },
@@ -77,8 +79,12 @@ const Exporter = {
         loose.forEach(n=>{ L.push('- '+this.label(n)); if(n.memo) n.memo.split('\n').forEach(m=>L.push('  > '+m)); }); }
       const es=Object.values(sh.edges);
       if(es.length){ L.push('','**接続**','');
-        es.forEach(e=>{ const a=sh.nodes[e.from], b=sh.nodes[e.to]; if(a&&b)
-          L.push('- '+this.label(a)+' → '+this.label(b)+(e.label?' : '+e.label:'')); }); }
+        es.forEach(e=>{ const a=sh.nodes[e.from], b=sh.nodes[e.to]; if(!a||!b) return;
+          if(e.label){
+            const lines=this.edgeLabelMd(e.label);
+            L.push('- '+this.label(a)+' → '+this.label(b)+' : '+(lines[0]||''));
+            lines.slice(1).forEach(line=>L.push('  '+line));
+          } else L.push('- '+this.label(a)+' → '+this.label(b)); }); }
       L.push('');
     });
     return L.join('\n');
@@ -124,7 +130,7 @@ const Exporter = {
     for(const id in sh.nodes){ if(sm.used.has(id)) continue; const n=sh.nodes[id]; L.push('  '+sid(id)+'["'+tx(n)+'"]'); }
     for(const id in sh.nodes){ const n=sh.nodes[id]; if(n.kind==='tree' && n.parentId && sh.nodes[n.parentId]) L.push('  '+sid(n.parentId)+' --> '+sid(id)); }
     for(const eid in sh.edges){ const e=sh.edges[eid]; if(sh.nodes[e.from]&&sh.nodes[e.to])
-      L.push('  '+sid(e.from)+(e.label?' -->|'+e.label.replace(/"/g,"'")+'| ':' --> ')+sid(e.to)); }
+      L.push('  '+sid(e.from)+(e.label?' -->|'+this.edgeLabelMermaid(e.label)+'| ':' --> ')+sid(e.to)); }
     Object.values(sh.sections||{}).forEach(sec=>{ const line=styleLine(secid(sec.id),sec.style); if(line) L.push(line); });
     for(const id in sh.nodes){ const line=styleLine(sid(id),sh.nodes[id].style); if(line) L.push(line); }
     return L.join('\n');

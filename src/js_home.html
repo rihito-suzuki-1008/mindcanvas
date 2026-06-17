@@ -62,9 +62,10 @@ const Home = {
       Store.saveAndBackup(copy); this.render(); App.toast('複製しました');
     });
   },
-  remove(id,name){
+  async remove(id,name){
     if(this.openingId) return;
-    if(!confirm('「'+(name||'このプロジェクト')+'」を削除しますか？\nこの操作は元に戻せません。')) return;
+    const ok=await Dialog.confirm('プロジェクトを削除', '「'+(name||'このプロジェクト')+'」を削除します。この操作は元に戻せません。', {danger:true, okText:'削除'});
+    if(!ok) return;
     Store.deleteProject(id); this.render(); App.toast('削除しました');
   },
 
