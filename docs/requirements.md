@@ -134,6 +134,7 @@
 | FR-9.5 | セクションはMarkdown exportでまとまりとして出力し、Mermaid exportでは `subgraph` として出力する。 |
 | FR-9.6 | Mermaid import は `flowchart` / `graph` のノード、`-->` 接続、`subgraph` を読み取り、新規シートにノード・エッジ・セクションとして配置する。 |
 | FR-9.6a | Mermaid import で未対応の行は無視し、件数を通知する。 |
+| FR-9.6b | Mermaid import の配置は `LR/TB/BT/RL` の向き、連結成分の分離、分岐・合流の接続順を考慮して、ノード同士が重なりにくい状態で作成する。 |
 
 ---
 

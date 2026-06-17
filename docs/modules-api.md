@@ -119,7 +119,7 @@
 `run(kind)`（'png'|'pdf'|'md'|'mermaid'）/ `capture()`（fit→html-to-image→復元）/ `png()` / `pdf()` / `markdown()` / `mermaid()` / `showText(title,text,ext)`
 
 ## Importer（js_import）
-`init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `buildSheet(parsed)` / `levels(nodes,edges)`
+`init()` / `show()` / `importMermaid(text)` / `parseMermaid(text)` / `parseEdges(line)` / `buildSheet(parsed)` / `layout(parsed)` / `components(nodes,edges,order)` / `ranks(ids,edges,order)` / `orderRanks(ids,edges,ranks,order)` / `placeRanks(byRank,direction,edges,ranksById)` / `rowCoords(byRank,edges,ranksById)` / `edgeSides(a,b)` / `levels(nodes,edges)`。`levels` は旧配置ロジック互換用。
 
 ## Dialog（js_dialog）
 `open(opts)` / `prompt(title,value,opts)` / `confirm(title,message,opts)`。単一行入力、複数行入力（`opts.multiline`）、確認ダイアログをアプリ内モーダルで表示する。`Escape` でキャンセル、単一行は `Enter`、複数行は `Ctrl/⌘ + Enter` で確定。
