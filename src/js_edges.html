@@ -43,7 +43,14 @@ const Edges = {
     return { x:u*u*u*p0.x+3*u*u*t*c0.x+3*u*t*t*c1.x+t*t*t*p1.x,
              y:u*u*u*p0.y+3*u*u*t*c0.y+3*u*t*t*c1.y+t*t*t*p1.y }; },
 
-  geom(e){
+  reverseOffset(e,sheet,p0,p1){
+    const hasReverse=Object.values(sheet.edges||{}).some(x=>x.id!==e.id && x.from===e.to && x.to===e.from);
+    if(!hasReverse) return {x:0,y:0};
+    const dx=p1.x-p0.x, dy=p1.y-p0.y, len=Math.hypot(dx,dy)||1, amount=18;
+    return { x:-dy/len*amount, y:dx/len*amount };
+  },
+
+  geom(e,sheet){
     const ra=this.nodeRect(e.from), rb=this.nodeRect(e.to); if(!ra||!rb) return null;
     let fs=e.fromSide, ts=e.toSide;
     if(!fs||!ts){ const auto=this.autoSides(ra,rb); if(!fs) fs=auto[0]; if(!ts) ts=auto[1]; }
@@ -52,8 +59,11 @@ const Edges = {
     const dist=Math.hypot(p1.x-p0.x,p1.y-p0.y);
     const k=e.kind==='curve'?clamp(dist*0.5,80,400):clamp(dist*0.4,30,170);
     const c0={x:p0.x+n0.x*k, y:p0.y+n0.y*k}, c1={x:p1.x+n1.x*k, y:p1.y+n1.y*k};
-    return { d:'M'+p0.x+','+p0.y+' C'+c0.x+','+c0.y+' '+c1.x+','+c1.y+' '+p1.x+','+p1.y,
-             mid:this.bez(p0,c0,c1,p1,0.5) };
+    const off=this.reverseOffset(e,sheet,p0,p1);
+    const q0={x:p0.x+off.x,y:p0.y+off.y}, q1={x:p1.x+off.x,y:p1.y+off.y};
+    const qc0={x:c0.x+off.x,y:c0.y+off.y}, qc1={x:c1.x+off.x,y:c1.y+off.y};
+    return { d:'M'+q0.x+','+q0.y+' C'+qc0.x+','+qc0.y+' '+qc1.x+','+qc1.y+' '+q1.x+','+q1.y,
+             mid:this.bez(q0,qc0,qc1,q1,0.5) };
   },
 
   render(sheet){
@@ -62,7 +72,7 @@ const Edges = {
       const e=sheet.edges[id];
       const fa=sheet.nodes[e.from], fb=sheet.nodes[e.to];
       if(!fa||!fb||fa._hidden||fb._hidden){ this._remove(id); continue; }
-      const g=this.geom(e); if(!g){ this._remove(id); continue; }
+      const g=this.geom(e,sheet); if(!g){ this._remove(id); continue; }
       present[id]=1;
       let p=this.paths[id];
       if(!p){ p=document.createElementNS(NS,'path'); p.setAttribute('class','edge'); p.setAttribute('fill','none');
